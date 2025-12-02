@@ -165,8 +165,8 @@ const SocketHandler = (req: NextApiRequest, res: ExtendedResponse) => {
             // Set as current
             room.currentSong = song;
 
-            // Emit now_playing (skipping announcement)
-            io.to(roomId).emit('now_playing', song);
+            // Emit announcement (Manual Start required)
+            io.to(roomId).emit('singer_announcement', song);
             io.to(roomId).emit('queue_updated', room.queue);
             console.log(`[Socket] Play Now triggered for ${song.title} in ${roomId}`);
           }

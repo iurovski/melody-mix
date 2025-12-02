@@ -174,24 +174,18 @@ export default function HostPage() {
             return;
         }
         if (!roomId) {
-            alert('ERRO CRÍTICO: Sala não identificada. Recarregue a página.');
+            addLog('ERRO CRÍTICO: Sala não identificada. Recarregue a página.');
             return;
         }
 
         addLog(`Enviando add_to_queue: ${song.title} (Room: ${roomId})`);
 
-        // Re-enable callback for definitive confirmation
-        const timeout = setTimeout(() => {
-            alert('ALERTA: O servidor demorou para responder. Verifique se a música apareceu.');
-        }, 3000);
-
         socket.emit('add_to_queue', { roomId, song }, (response: any) => {
-            clearTimeout(timeout);
             if (response?.success) {
-                alert(`Sucesso! Música "${song.title}" adicionada.`);
+                addLog(`Sucesso! Música "${song.title}" adicionada.`);
                 addLog('Callback: Sucesso');
             } else {
-                alert(`Erro do Servidor: ${response?.error}`);
+                addLog(`Erro do Servidor: ${response?.error}`);
                 addLog(`Callback Erro: ${response?.error}`);
             }
         });
