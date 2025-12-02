@@ -111,8 +111,9 @@ const SocketHandler = (req: NextApiRequest, res: ExtendedResponse) => {
           // Auto-play if nothing is playing
           if (!room.currentSong) {
             room.currentSong = newSong;
-            io.to(roomId).emit('now_playing', newSong);
-            console.log(`[Socket] Auto-playing song in ${roomId}: ${song.title}`);
+            // Emit announcement instead of playing immediately
+            io.to(roomId).emit('singer_announcement', newSong);
+            console.log(`[Socket] Announcing next singer in ${roomId}: ${song.title}`);
           } else {
             room.queue.push(newSong);
             io.to(roomId).emit('queue_updated', room.queue);
@@ -140,19 +141,34 @@ const SocketHandler = (req: NextApiRequest, res: ExtendedResponse) => {
         }
       });
 
-      // Move song in queue (Admin)
-      socket.on('move_in_queue', ({ roomId, songUuid, direction }: { roomId: string; songUuid: string; direction: 'up' | 'down' }) => {
+      // Move song in queue (Admin/Host - DnD)
+      socket.on('move_in_queue', ({ roomId, oldIndex, newIndex }: { roomId: string; oldIndex: number; newIndex: number }) => {
         const room = rooms[roomId];
         if (room) {
-          const index = room.queue.findIndex(s => s.uuid === songUuid);
-          if (index === -1) return;
-
-          const newIndex = direction === 'up' ? index - 1 : index + 1;
-
-          if (newIndex >= 0 && newIndex < room.queue.length) {
-            const [movedSong] = room.queue.splice(index, 1);
+          if (oldIndex >= 0 && oldIndex < room.queue.length && newIndex >= 0 && newIndex < room.queue.length) {
+            const [movedSong] = room.queue.splice(oldIndex, 1);
             room.queue.splice(newIndex, 0, movedSong);
             io.to(roomId).emit('queue_updated', room.queue);
+          }
+        }
+      });
+
+      // Play specific song immediately (Host/Admin)
+      socket.on('play_now', ({ roomId, songUuid }: { roomId: string; songUuid: string }) => {
+        const room = rooms[roomId];
+        if (room) {
+          const songIndex = room.queue.findIndex(s => s.uuid === songUuid);
+          if (songIndex !== -1) {
+            // Remove from queue
+            const [song] = room.queue.splice(songIndex, 1);
+
+            // Set as current
+            room.currentSong = song;
+
+            // Emit now_playing (skipping announcement)
+            io.to(roomId).emit('now_playing', song);
+            io.to(roomId).emit('queue_updated', room.queue);
+            console.log(`[Socket] Play Now triggered for ${song.title} in ${roomId}`);
           }
         }
       });
@@ -160,11 +176,27 @@ const SocketHandler = (req: NextApiRequest, res: ExtendedResponse) => {
       // Play next song
       socket.on('play_next', ({ roomId }) => {
         const room = rooms[roomId];
-        if (room && room.queue.length > 0) {
-          const nextSong = room.queue.shift();
-          room.currentSong = nextSong || null;
-          io.to(roomId).emit('now_playing', nextSong);
-          io.to(roomId).emit('queue_updated', room.queue);
+        if (room) {
+          if (room.queue.length > 0) {
+            const nextSong = room.queue.shift();
+            room.currentSong = nextSong || null;
+            // Emit announcement instead of playing immediately
+            io.to(roomId).emit('singer_announcement', nextSong);
+            io.to(roomId).emit('queue_updated', room.queue);
+          } else {
+            // Queue is empty, end playback (Idle State)
+            room.currentSong = null;
+            io.to(roomId).emit('now_playing', null);
+            io.to(roomId).emit('queue_updated', room.queue);
+          }
+        }
+      });
+
+      // Start performance (Manual trigger)
+      socket.on('start_performance', ({ roomId }) => {
+        const room = rooms[roomId];
+        if (room && room.currentSong) {
+          io.to(roomId).emit('now_playing', room.currentSong);
         }
       });
 

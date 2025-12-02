@@ -16,6 +16,10 @@ export default function HostPage() {
     const [isPlaying, setIsPlaying] = useState(true);
     const [adminQrVisible, setAdminQrVisible] = useState(true);
     const [adminTimer, setAdminTimer] = useState(120); // 2 minutes
+    const [announcementData, setAnnouncementData] = useState<Song | null>(null);
+
+    const [logs, setLogs] = useState<string[]>([]);
+    const addLog = (msg: string) => setLogs(prev => [...prev, `${new Date().toLocaleTimeString()} - ${msg}`]);
 
     // Socket Event Listeners
     useEffect(() => {
@@ -25,8 +29,15 @@ export default function HostPage() {
             setQueue(updatedQueue);
         });
 
+        socket.on('singer_announcement', (song: Song) => {
+            addLog(`Anúncio: ${song.title} (${song.addedBy})`);
+            setAnnouncementData(song);
+            setIsPlaying(false);
+        });
+
         socket.on('now_playing', (song: Song | null) => {
             addLog(`Evento now_playing recebido: ${song?.title}`);
+            setAnnouncementData(null); // Hide announcement
             setCurrentSong(song);
             setIsPlaying(true);
         });
@@ -37,30 +48,19 @@ export default function HostPage() {
 
         return () => {
             socket.off('queue_updated');
+            socket.off('singer_announcement');
             socket.off('now_playing');
             socket.off('playback_action');
         };
     }, [socket]);
 
-    // Admin QR Timer
-    useEffect(() => {
-        if (roomId && adminQrVisible) {
-            const interval = setInterval(() => {
-                setAdminTimer((prev) => {
-                    if (prev <= 1) {
-                        setAdminQrVisible(false);
-                        clearInterval(interval);
-                        return 0;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
-            return () => clearInterval(interval);
-        }
-    }, [roomId, adminQrVisible]);
+    // ... (rest of the code)
 
-    const [logs, setLogs] = useState<string[]>([]);
-    const addLog = (msg: string) => setLogs(prev => [...prev, `${new Date().toLocaleTimeString()} - ${msg}`]);
+    const handleStartPerformance = () => {
+        if (socket && roomId) {
+            socket.emit('start_performance', { roomId });
+        }
+    };
 
     // Listen for room_created event as fallback
     useEffect(() => {
@@ -139,19 +139,6 @@ export default function HostPage() {
         }
     };
 
-    // ... (rest of the component)
-
-    // Update button to use isCreating
-    // ...
-    // This button is part of the form below, so it's commented out here to avoid duplication.
-    // <button
-    //     type="submit"
-    //     disabled={!isConnected || !roomName || isCreating}
-    //     className="w-full py-3 bg-[var(--neon-purple)] hover:bg-[var(--neon-pink)] text-white font-bold rounded-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-    // >
-    //     {isCreating ? 'CRIANDO...' : (isConnected ? 'CRIAR SALA' : 'CONECTANDO...')}
-    // </button>
-
     const handleSongEnd = () => {
         if (socket && roomId) {
             socket.emit('play_next', { roomId });
@@ -164,9 +151,15 @@ export default function HostPage() {
         }
     };
 
-    const handleMoveSong = (uuid: string, direction: 'up' | 'down') => {
+    const handleMoveSong = (oldIndex: number, newIndex: number) => {
         if (socket && roomId) {
-            socket.emit('move_in_queue', { roomId, songUuid: uuid, direction });
+            socket.emit('move_in_queue', { roomId, oldIndex, newIndex });
+        }
+    };
+
+    const handlePlayNow = (uuid: string) => {
+        if (socket && roomId) {
+            socket.emit('play_now', { roomId, songUuid: uuid });
         }
     };
 
@@ -246,24 +239,67 @@ export default function HostPage() {
         );
     }
 
+    // ... (inside return)
+
     return (
         <div className="flex h-screen bg-black overflow-hidden">
-            {/* Main Content - Video Player */}
+            {/* Main Content - Video Player OR Announcement */}
             <div className="flex-1 relative">
-                <VideoPlayer
-                    currentSong={currentSong}
-                    onEnded={handleSongEnd}
-                    isPlaying={isPlaying}
-                />
+                {announcementData ? (
+                    <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl p-10 text-center animate-fade-in">
+                        <h2 className="text-[var(--neon-blue)] text-2xl font-bold uppercase tracking-widest mb-4">Próximo Cantor</h2>
+                        <h1 className="text-white text-6xl md:text-8xl font-black mb-8 text-glow-purple drop-shadow-2xl">
+                            {announcementData.addedBy}
+                        </h1>
+                        <div className="bg-white/10 p-6 rounded-2xl border border-white/20 mb-12 max-w-3xl">
+                            <p className="text-gray-400 text-sm uppercase tracking-wider mb-2">Vai cantar</p>
+                            <p className="text-white text-3xl md:text-4xl font-bold leading-tight">
+                                {announcementData.title}
+                            </p>
+                        </div>
+                        <button
+                            onClick={handleStartPerformance}
+                            className="px-12 py-6 bg-gradient-to-r from-[var(--neon-purple)] to-[var(--neon-pink)] text-white text-2xl font-bold rounded-full shadow-lg shadow-purple-500/50 hover:scale-105 transition-transform duration-300 animate-pulse"
+                        >
+                            INICIAR APRESENTAÇÃO ▶
+                        </button>
+                    </div>
+                ) : currentSong ? (
+                    <VideoPlayer
+                        currentSong={currentSong}
+                        onEnded={handleSongEnd}
+                        isPlaying={isPlaying}
+                    />
+                ) : (
+                    /* Idle Screen */
+                    <div className="absolute inset-0 z-0 flex flex-col items-center justify-center bg-black text-[var(--neon-purple)]">
+                        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1516280440614-6697288d5d38?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-20"></div>
+                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent"></div>
 
+                        <div className="relative z-10 text-center animate-pulse-slow">
+                            <h1 className="text-7xl md:text-9xl font-black mb-6 text-glow-purple tracking-tighter">
+                                MELODY MIX
+                            </h1>
+                            <p className="text-2xl md:text-4xl text-white font-light tracking-widest uppercase mb-12">
+                                Venha soltar a voz com a gente!
+                            </p>
 
+                            <div className="bg-white/10 p-8 rounded-3xl border border-white/20 backdrop-blur-md inline-flex flex-col items-center gap-4 shadow-2xl shadow-purple-900/20">
+                                <div className="bg-white p-4 rounded-xl">
+                                    <QRCodeSVG value={guestUrl} size={200} level="L" includeMargin={false} />
+                                </div>
+                                <p className="text-[var(--neon-blue)] text-sm font-bold uppercase tracking-wider">Escaneie para pedir música</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
-                {/* Room Info */}
-                <div className="absolute top-8 right-8 text-right z-50">
+                {/* Room Info (Keep visible) */}
+                <div className="absolute top-8 right-8 text-right z-50 pointer-events-none">
                     <h2 className="text-3xl font-bold text-white text-glow-blue">{roomName}</h2>
                     <p className="text-[var(--neon-blue)] font-mono text-xs">Room ID: {roomId}</p>
                     <p className="text-gray-500 font-mono text-[10px]">Socket: {socket?.id || '...'}</p>
-                    <div className="flex items-center justify-end gap-2 mt-2">
+                    <div className="flex items-center justify-end gap-2 mt-2 pointer-events-auto">
                         <div className={`text-xs font-bold px-2 py-1 rounded inline-block ${isConnected ? 'bg-green-500/20 text-green-400 border border-green-500/50' : 'bg-red-500/20 text-red-400 border border-red-500/50 animate-pulse'}`}>
                             {isConnected ? '● CONECTADO' : '○ DESCONECTADO'}
                         </div>
@@ -286,6 +322,7 @@ export default function HostPage() {
                     onRemove={handleRemoveSong}
                     onMove={handleMoveSong}
                     onAdd={handleAddSong}
+                    onPlayNow={handlePlayNow}
                     guestUrl={guestUrl}
                 />
             </div>

@@ -63,17 +63,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ currentSong, onEnded, 
     }, [isPlaying]);
 
     if (!currentSong) {
-        return (
-            <div className="w-full h-full flex items-center justify-center bg-black text-[var(--neon-purple)]">
-                <div className="text-center animate-pulse">
-                    <h1 className="text-6xl font-bold mb-4 text-glow-purple">MELODY MIX</h1>
-                    <p className="text-xl text-white/80">Aguardando músicas...</p>
-                    <div className="mt-8 p-4 border border-[var(--neon-blue)] rounded-lg inline-block">
-                        <p className="text-sm text-[var(--neon-blue)]">Escaneie o QR Code para começar</p>
-                    </div>
-                </div>
-            </div>
-        );
+        return null;
     }
 
     // 1. URL Handling & 2. Origin Parameter
