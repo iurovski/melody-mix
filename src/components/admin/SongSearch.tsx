@@ -77,7 +77,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong }) => {
                         type="text"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Cole um link do YouTube ou pesquise..."
+                        placeholder="Pesquise músicas no YouTube"
                         className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-purple-500"
                     />
                     <button
