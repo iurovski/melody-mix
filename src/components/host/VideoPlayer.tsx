@@ -20,10 +20,15 @@ type YouTubePlayer = {
     getPlayerState?: () => number;
 };
 
+type YouTubePlayerEvents = {
+    onStateChange?: (event: { data: number }) => void;
+    onError?: (event?: unknown) => void;
+};
+
 type YTNamespace = {
     Player: new (
         element: HTMLIFrameElement,
-        config: { events: { onStateChange: (event: { data: number }) => void } }
+        config: { events: YouTubePlayerEvents }
     ) => YouTubePlayer;
 };
 
@@ -120,6 +125,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ currentSong, onEnded, 
     // Initialize Player when API is ready and iframe exists
     useEffect(() => {
         if (isApiReady && iframeRef.current && !playerRef.current && currentSong) {
+            if (!window.YT) return;
             playerRef.current = new window.YT.Player(iframeRef.current, {
                 events: {
                     'onStateChange': (event: { data: number }) => {

@@ -29,7 +29,7 @@ export function GuestView({ roomIdFromUrl }: { roomIdFromUrl?: string }) {
     useEffect(() => {
         if (socket && roomId && hasJoined) {
             socket.emit('join_room', roomId, (response: JoinRoomResponse) => {
-                if (response.success) {
+                if (response.success && response.roomState) {
                     setQueue(response.roomState.queue);
                     setCurrentSong(response.roomState.currentSong);
                 } else {
