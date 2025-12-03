@@ -281,14 +281,24 @@ export default function HostPage() {
             <div className="flex-1 relative">
                 {adminQrVisible && (
                     <div className="absolute bottom-8 left-8 z-50 bg-black/80 border border-[var(--neon-purple)] rounded-2xl p-4 shadow-2xl shadow-purple-900/40 backdrop-blur-md w-72">
-                        <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-start justify-between mb-3 gap-2">
                             <div>
                                 <p className="text-xs text-[var(--neon-blue)] font-bold uppercase tracking-wider">Painel Admin</p>
                                 <p className="text-white text-sm">Escaneie para assumir a fila</p>
                             </div>
-                            <span className="px-2 py-1 text-[10px] font-bold rounded bg-white/10 border border-white/10 text-gray-300">
-                                {Math.max(adminTimer, 0)}s
-                            </span>
+                            <div className="flex items-center gap-2">
+                                <span className="px-2 py-1 text-[10px] font-bold rounded bg-white/10 border border-white/10 text-gray-300">
+                                    {Math.max(adminTimer, 0)}s
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setAdminQrVisible(false)}
+                                    className="text-gray-400 hover:text-white text-sm px-2"
+                                    title="Fechar QR"
+                                >
+                                    ✕
+                                </button>
+                            </div>
                         </div>
                         <div className="flex flex-col items-center gap-2">
                             <div className="bg-white p-2 rounded-xl">
