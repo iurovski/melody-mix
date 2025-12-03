@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useSocket } from '@/hooks/useSocket';
 import { VideoPlayer } from '@/components/host/VideoPlayer';
 import { HostControls } from '@/components/host/HostControls';
@@ -17,9 +17,27 @@ export default function HostPage() {
     const [adminQrVisible, setAdminQrVisible] = useState(true);
     const [adminTimer, setAdminTimer] = useState(120); // 2 minutes
     const [announcementData, setAnnouncementData] = useState<Song | null>(null);
+    const [isCreating, setIsCreating] = useState(false);
 
     const [logs, setLogs] = useState<string[]>([]);
-    const addLog = (msg: string) => setLogs(prev => [...prev, `${new Date().toLocaleTimeString()} - ${msg}`]);
+    const addLog = useCallback((msg: string) => {
+        setLogs(prev => [...prev, `${new Date().toLocaleTimeString()} - ${msg}`]);
+    }, []);
+    const enqueueLog = useCallback((msg: string) => queueMicrotask(() => addLog(msg)), [addLog]);
+
+    type JoinRoomResponse = {
+        success: boolean;
+        error?: string;
+        roomState?: {
+            queue: Song[];
+            currentSong: Song | null;
+        };
+    };
+
+    type AddSongResponse = {
+        success?: boolean;
+        error?: string;
+    };
 
     // Socket Event Listeners
     useEffect(() => {
@@ -52,7 +70,7 @@ export default function HostPage() {
             socket.off('now_playing');
             socket.off('playback_action');
         };
-    }, [socket]);
+    }, [socket, addLog]);
 
     // ... (rest of the code)
 
@@ -67,7 +85,7 @@ export default function HostPage() {
         if (!socket) return;
 
         socket.on('room_created', (response: { roomId: string }) => {
-            addLog(`Evento room_created recebido: ${JSON.stringify(response)}`);
+            enqueueLog(`Evento room_created recebido: ${JSON.stringify(response)}`);
             if (response && response.roomId) {
                 setRoomId(response.roomId);
                 setIsCreating(false);
@@ -77,30 +95,28 @@ export default function HostPage() {
         return () => {
             socket.off('room_created');
         };
-    }, [socket]);
-
-    const [isCreating, setIsCreating] = useState(false);
+    }, [socket, enqueueLog]);
 
     // Join room when roomId is set or socket reconnects
     useEffect(() => {
         if (socket && isConnected && roomId) {
-            addLog(`Socket conectado (${socket.id}). Tentando entrar na sala: ${roomId}`);
-            socket.emit('join_room', roomId, (response: any) => {
-                addLog(`Join Room Response: ${JSON.stringify(response)}`);
+            enqueueLog(`Socket conectado (${socket.id}). Tentando entrar na sala: ${roomId}`);
+            socket.emit('join_room', roomId, (response: JoinRoomResponse) => {
+                enqueueLog(`Join Room Response: ${JSON.stringify(response)}`);
                 if (!response.success) {
-                    addLog(`Erro ao entrar na sala: ${response.error}`);
+                    enqueueLog(`Erro ao entrar na sala: ${response.error}`);
                     if (response.error === 'Room not found') {
                         alert('A sala não existe mais no servidor. Por favor, recrie a sala.');
                         setRoomId(''); // Reset to allow recreation
                     }
                 } else {
-                    addLog('Entrou na sala com sucesso!');
+                    enqueueLog('Entrou na sala com sucesso!');
                 }
             });
         } else if (!isConnected && roomId) {
-            addLog('Socket desconectado. Aguardando reconexão...');
+            enqueueLog('Socket desconectado. Aguardando reconexão...');
         }
-    }, [socket, isConnected, roomId]);
+    }, [socket, isConnected, roomId, enqueueLog]);
 
     const createRoom = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -163,7 +179,7 @@ export default function HostPage() {
         }
     };
 
-    const handleAddSong = (song: any) => {
+    const handleAddSong = (song: Omit<Song, 'uuid' | 'addedAt'>) => {
         if (!socket) {
             alert('ERRO CRÍTICO: Objeto Socket não existe. Recarregue a página.');
             return;
@@ -180,7 +196,7 @@ export default function HostPage() {
 
         addLog(`Enviando add_to_queue: ${song.title} (Room: ${roomId})`);
 
-        socket.emit('add_to_queue', { roomId, song }, (response: any) => {
+        socket.emit('add_to_queue', { roomId, song }, (response: AddSongResponse) => {
             if (response?.success) {
                 addLog(`Sucesso! Música "${song.title}" adicionada.`);
                 addLog('Callback: Sucesso');
@@ -191,10 +207,34 @@ export default function HostPage() {
         });
     };
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-    // Update URLs to point to dynamic routes correctly
+    const siteUrl = typeof window !== 'undefined'
+        ? window.location.origin
+        : (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000');
     const guestUrl = `${siteUrl}/guest/${roomId}`;
     const adminUrl = `${siteUrl}/admin/${roomId}`;
+
+    // Admin QR code auto-expiration
+    useEffect(() => {
+        if (!roomId) return;
+
+        setTimeout(() => {
+            setAdminQrVisible(true);
+            setAdminTimer(120);
+        }, 0);
+
+        const interval = setInterval(() => {
+            setAdminTimer((prev) => {
+                if (prev <= 1) {
+                    clearInterval(interval);
+                    setAdminQrVisible(false);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [roomId]);
 
     if (!roomId) {
         return (
@@ -239,6 +279,28 @@ export default function HostPage() {
         <div className="flex h-screen bg-black overflow-hidden">
             {/* Main Content - Video Player OR Announcement */}
             <div className="flex-1 relative">
+                {adminQrVisible && (
+                    <div className="absolute bottom-8 left-8 z-50 bg-black/80 border border-[var(--neon-purple)] rounded-2xl p-4 shadow-2xl shadow-purple-900/40 backdrop-blur-md w-72">
+                        <div className="flex items-center justify-between mb-3">
+                            <div>
+                                <p className="text-xs text-[var(--neon-blue)] font-bold uppercase tracking-wider">Painel Admin</p>
+                                <p className="text-white text-sm">Escaneie para assumir a fila</p>
+                            </div>
+                            <span className="px-2 py-1 text-[10px] font-bold rounded bg-white/10 border border-white/10 text-gray-300">
+                                {Math.max(adminTimer, 0)}s
+                            </span>
+                        </div>
+                        <div className="flex flex-col items-center gap-2">
+                            <div className="bg-white p-2 rounded-xl">
+                                <QRCodeSVG value={adminUrl} size={140} level="L" includeMargin={false} />
+                            </div>
+                            <p className="text-[var(--neon-purple)] text-xs uppercase tracking-wider text-center">
+                                Válido por 2 minutos após a criação
+                            </p>
+                        </div>
+                    </div>
+                )}
+
                 {announcementData ? (
                     <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl p-10 text-center animate-fade-in">
                         <h2 className="text-[var(--neon-blue)] text-2xl font-bold uppercase tracking-widest mb-4">Próximo Cantor</h2>

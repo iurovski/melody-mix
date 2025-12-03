@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import React, { useState } from 'react';
 import { Song } from '@/types';
 
@@ -6,9 +7,16 @@ interface SongSearchProps {
     guestName: string;
 }
 
+type SearchResult = {
+    id: string;
+    title: string;
+    thumbnail: string;
+    channelTitle: string;
+};
+
 export const SongSearch: React.FC<SongSearchProps> = ({ onAdd, guestName }) => {
     const [query, setQuery] = useState('');
-    const [results, setResults] = useState<any[]>([]);
+    const [results, setResults] = useState<SearchResult[]>([]);
     const [loading, setLoading] = useState(false);
 
     const searchYoutube = async (e: React.FormEvent) => {
@@ -16,18 +24,13 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAdd, guestName }) => {
         if (!query.trim()) return;
 
         setLoading(true);
-        const apiKey = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
         const searchQuery = `${query} karaoke`;
 
         try {
-            const res = await fetch(
-                `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(
-                    searchQuery
-                )}&type=video&maxResults=10&key=${apiKey}`
-            );
+            const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`);
             const data = await res.json();
-            if (data.items) {
-                setResults(data.items);
+            if (data.results) {
+                setResults(data.results as SearchResult[]);
             }
         } catch (error) {
             console.error('Error searching YouTube:', error);
@@ -36,11 +39,11 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAdd, guestName }) => {
         }
     };
 
-    const handleSelect = (item: any) => {
+    const handleSelect = (item: SearchResult) => {
         const song = {
-            id: item.id.videoId,
-            title: item.snippet.title,
-            thumbnail: item.snippet.thumbnails.medium.url,
+            id: item.id,
+            title: item.title,
+            thumbnail: item.thumbnail,
             addedBy: guestName,
         };
         onAdd(song);
@@ -72,21 +75,18 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAdd, guestName }) => {
             <div className="space-y-3">
                 {results.map((item) => (
                     <div
-                        key={item.id.videoId}
+                        key={item.id}
                         onClick={() => handleSelect(item)}
                         className="flex items-center gap-3 bg-white/5 p-3 rounded-xl active:bg-white/20 transition-colors cursor-pointer border border-transparent hover:border-[var(--neon-purple)]"
                     >
                         <img
-                            src={item.snippet.thumbnails.default.url}
-                            alt={item.snippet.title}
+                            src={item.thumbnail}
+                            alt={item.title}
                             className="w-20 h-14 object-cover rounded-lg"
                         />
                         <div className="flex-1 min-w-0">
-                            <h3
-                                className="text-white text-sm font-medium line-clamp-2"
-                                dangerouslySetInnerHTML={{ __html: item.snippet.title }}
-                            />
-                            <p className="text-gray-400 text-xs mt-1">{item.snippet.channelTitle}</p>
+                            <h3 className="text-white text-sm font-medium line-clamp-2 break-words">{item.title}</h3>
+                            <p className="text-gray-400 text-xs mt-1 truncate break-words">{item.channelTitle}</p>
                         </div>
                         <button className="text-[var(--neon-blue)] text-xl font-bold">+</button>
                     </div>

@@ -33,7 +33,16 @@ export async function GET(request: Request) {
             const data = await res.json();
 
             if (data.items) {
-                const results = data.items.map((item: any) => ({
+                type YouTubeSearchItem = {
+                    id: { videoId: string };
+                    snippet: {
+                        title: string;
+                        thumbnails: { medium: { url: string } };
+                        channelTitle: string;
+                    };
+                };
+
+                const results = (data.items as YouTubeSearchItem[]).map((item) => ({
                     id: item.id.videoId,
                     title: item.snippet.title,
                     thumbnail: item.snippet.thumbnails.medium.url,

@@ -1,106 +1,193 @@
 'use client';
+/* eslint-disable @next/next/no-img-element */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSocket } from '@/hooks/useSocket';
 import { useParams } from 'next/navigation';
 import { SongSearch } from '@/components/admin/SongSearch';
 import { AdminQueue } from '@/components/admin/AdminQueue';
+import { Song } from '@/types';
 
 const AdminPage = () => {
     const params = useParams();
-    const sessionId = params?.sessionId as string;
+    const roomId = params?.sessionId as string;
 
     const { socket, isConnected } = useSocket();
-    const [queue, setQueue] = React.useState<any[]>([]);
+    const [queue, setQueue] = useState<Song[]>([]);
+    const [currentSong, setCurrentSong] = useState<Song | null>(null);
+    const [isPlaying, setIsPlaying] = useState(true);
+    const [status, setStatus] = useState('Aguardando conexão...');
+    type JoinRoomResponse = {
+        success: boolean;
+        error?: string;
+        roomState?: {
+            queue: Song[];
+            currentSong: Song | null;
+        };
+    };
 
     useEffect(() => {
-        if (socket && isConnected && sessionId) {
-            socket.emit('join_room', sessionId, (response: any) => {
+        if (socket && isConnected && roomId) {
+            socket.emit('join_room', roomId, (response: JoinRoomResponse) => {
                 if (response.success) {
-                    console.log('Admin joined room:', sessionId);
-                    if (response.roomState) {
-                        setQueue(response.roomState.queue);
-                    }
+                    setQueue(response.roomState.queue);
+                    setCurrentSong(response.roomState.currentSong);
+                    setStatus('Conectado');
                 } else {
-                    console.error('Failed to join room:', response.error);
+                    setStatus(response.error || 'Sala não encontrada');
                 }
             });
         }
-    }, [socket, isConnected, sessionId]);
+    }, [socket, isConnected, roomId]);
 
     useEffect(() => {
         if (!socket) return;
 
-        socket.on('queue_updated', (updatedQueue: any[]) => {
-            setQueue(updatedQueue);
-        });
+        const handleQueueUpdated = (updatedQueue: Song[]) => setQueue(updatedQueue);
+        const handleNowPlaying = (song: Song | null) => {
+            setCurrentSong(song);
+            setIsPlaying(true);
+        };
+        const handlePlayback = (action: 'play' | 'pause') => setIsPlaying(action === 'play');
+
+        socket.on('queue_updated', handleQueueUpdated);
+        socket.on('now_playing', handleNowPlaying);
+        socket.on('playback_action', handlePlayback);
 
         return () => {
-            socket.off('queue_updated');
+            socket.off('queue_updated', handleQueueUpdated);
+            socket.off('now_playing', handleNowPlaying);
+            socket.off('playback_action', handlePlayback);
         };
     }, [socket]);
 
-    const handleAddSong = (song: any) => {
-        if (socket && sessionId) {
-            socket.emit('add_to_queue', { roomId: sessionId, song });
-        }
-    };
-
-    const handleRemoveSong = (uuid: string) => {
-        if (socket && sessionId) {
-            socket.emit('remove_from_queue', { roomId: sessionId, songUuid: uuid });
-        }
-    };
-
-    const handleMoveSong = (uuid: string, direction: 'up' | 'down') => {
-        if (socket && sessionId) {
-            socket.emit('move_in_queue', { roomId: sessionId, songUuid: uuid, direction });
+    const handleControl = (action: 'play' | 'pause') => {
+        if (socket && roomId) {
+            if (action === 'play') {
+                socket.emit('start_performance', { roomId });
+            }
+            socket.emit('control_playback', { roomId, action });
+            setIsPlaying(action === 'play');
         }
     };
 
     const handleSkip = () => {
-        if (socket && sessionId) {
-            socket.emit('play_next', { roomId: sessionId });
+        if (socket && roomId) {
+            socket.emit('play_next', { roomId });
+        }
+    };
+
+    const handleStartPerformance = () => {
+        if (socket && roomId) {
+            socket.emit('start_performance', { roomId });
+        }
+    };
+
+    const handleAddSong = (song: Omit<Song, 'uuid' | 'addedAt'>) => {
+        if (socket && roomId) {
+            socket.emit('add_to_queue', { roomId, song });
+        }
+    };
+
+    const handleRemoveSong = (uuid: string) => {
+        if (socket && roomId) {
+            socket.emit('remove_from_queue', { roomId, songUuid: uuid });
+        }
+    };
+
+    const handleMoveSong = (oldIndex: number, newIndex: number) => {
+        if (socket && roomId) {
+            socket.emit('move_in_queue', { roomId, oldIndex, newIndex });
+        }
+    };
+
+    const handlePlayNow = (uuid: string) => {
+        if (socket && roomId) {
+            socket.emit('play_now', { roomId, songUuid: uuid }, () => {
+                socket.emit('start_performance', { roomId });
+            });
         }
     };
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white p-4 md:p-8">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold text-red-500">Melody Mix - Admin</h1>
-                <div className="text-right">
-                    <p className="text-sm text-gray-400">ID da Sessão</p>
-                    <p className="font-mono text-xl font-bold">{sessionId}</p>
+        <div className="min-h-screen bg-gradient-to-b from-black via-gray-950 to-black text-white overflow-x-hidden">
+            <header className="border-b border-white/10 px-4 md:px-10 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <p className="text-[var(--neon-blue)] text-xs uppercase tracking-[0.3em]">Controle Remoto</p>
+                    <h1 className="text-3xl font-black tracking-tight">Melody Mix Admin</h1>
+                    <p className="text-gray-400 text-sm">{status}</p>
                 </div>
-            </div>
+                <div className="text-right">
+                    <p className="text-xs text-gray-400 uppercase">Sala</p>
+                    <p className="font-mono text-lg text-[var(--neon-purple)]">{roomId}</p>
+                    <span className={`inline-flex items-center gap-1 text-xs mt-1 px-2 py-1 rounded border ${isConnected ? 'border-green-500/40 text-green-400 bg-green-500/10' : 'border-red-500/40 text-red-400 bg-red-500/10'}`}>
+                        <span className="text-lg leading-none">{isConnected ? '•' : '○'}</span>
+                        {isConnected ? 'Online' : 'Offline'}
+                    </span>
+                </div>
+            </header>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-150px)]">
-                <div className="flex flex-col gap-6">
-                    {/* Controls */}
-                    <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-                        <h2 className="text-xl font-bold mb-4 text-white">Controles de Reprodução</h2>
-                        <button
-                            onClick={handleSkip}
-                            className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded transition-colors flex items-center justify-center gap-2"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                            </svg>
-                            Pular Música Atual
-                        </button>
+            <main className="p-4 md:p-8 lg:p-10 grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+                <div className="space-y-4 lg:space-y-6">
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-5 shadow-2xl shadow-purple-900/30">
+                        <p className="text-xs text-gray-400 uppercase mb-2">Tocando agora</p>
+                        {currentSong ? (
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                                <img src={currentSong.thumbnail} alt={currentSong.title} className="w-24 h-16 object-cover rounded-xl border border-white/10" />
+                                <div className="min-w-0">
+                                    <p className="text-lg font-bold line-clamp-2 break-words">{currentSong.title}</p>
+                                    <p className="text-sm text-[var(--neon-pink)]">Pedida por {currentSong.addedBy}</p>
+                                </div>
+                                <button
+                                    onClick={handleStartPerformance}
+                                    className="w-full sm:w-auto mt-2 sm:mt-0 px-4 py-2 bg-[var(--neon-purple)]/30 hover:bg-[var(--neon-purple)]/50 border border-[var(--neon-purple)]/60 rounded-xl text-sm font-bold"
+                                >
+                                    ▶ Iniciar música
+                                </button>
+                            </div>
+                        ) : (
+                            <p className="text-gray-500">Nenhuma música tocando.</p>
+                        )}
                     </div>
 
-                    {/* Search */}
-                    <div className="flex-1">
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-5 shadow-2xl shadow-purple-900/30">
+                        <p className="text-xs text-gray-400 uppercase mb-3">Playback</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <button
+                                onClick={() => handleControl('play')}
+                                className={`py-3 rounded-xl font-bold border ${isPlaying ? 'bg-green-500/20 text-green-400 border-green-500/60' : 'bg-white/5 text-white border-white/10'}`}
+                            >
+                                ▶ Play
+                            </button>
+                            <button
+                                onClick={() => handleControl('pause')}
+                                className={`py-3 rounded-xl font-bold border ${!isPlaying ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/60' : 'bg-white/5 text-white border-white/10'}`}
+                            >
+                                ❚❚ Pause
+                            </button>
+                            <button
+                                onClick={handleSkip}
+                                className="py-3 rounded-xl font-bold border bg-red-600/20 text-red-300 border-red-500/60 hover:bg-red-600/30"
+                            >
+                                ⏭ Pular
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-5 shadow-2xl shadow-purple-900/30">
                         <SongSearch onAddSong={handleAddSong} />
                     </div>
                 </div>
 
-                {/* Queue */}
-                <div className="h-full">
-                    <AdminQueue queue={queue} onRemove={handleRemoveSong} onMove={handleMoveSong} />
+                <div className="min-h-[420px]">
+                    <AdminQueue
+                        queue={queue}
+                        onRemove={handleRemoveSong}
+                        onMove={handleMoveSong}
+                        onPlayNow={handlePlayNow}
+                    />
                 </div>
-            </div>
+            </main>
         </div>
     );
 };

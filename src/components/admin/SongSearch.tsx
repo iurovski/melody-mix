@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @next/next/no-img-element */
 
 import React, { useState } from 'react';
 import { Song } from '@/types';
@@ -7,10 +8,17 @@ interface SongSearchProps {
     onAddSong: (song: Omit<Song, 'uuid' | 'addedAt'>) => void;
 }
 
+type SearchResult = {
+    id: string;
+    title: string;
+    thumbnail: string;
+    channelTitle: string;
+};
+
 export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong }) => {
     const [query, setQuery] = useState('');
     const [userName, setUserName] = useState('');
-    const [results, setResults] = useState<any[]>([]);
+    const [results, setResults] = useState<SearchResult[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
     const handleSearch = async (e: React.FormEvent) => {
@@ -24,7 +32,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong }) => {
             const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`);
             const data = await res.json();
             if (data.results) {
-                setResults(data.results);
+                setResults(data.results as SearchResult[]);
             }
         } catch (error) {
             console.error('Error searching:', error);
@@ -34,7 +42,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong }) => {
         }
     };
 
-    const handleAdd = (video: any) => {
+    const handleAdd = (video: SearchResult) => {
         if (!userName.trim()) {
             alert('Por favor, digite seu nome antes de adicionar.');
             return;
@@ -53,7 +61,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong }) => {
     };
 
     return (
-        <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+        <div className="bg-gray-800 p-6 rounded-lg shadow-lg w-full">
             <h2 className="text-xl font-bold mb-4 text-white">Adicionar Música</h2>
 
             <div className="mb-4">
@@ -82,17 +90,20 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong }) => {
                 </form>
             </div>
 
-            <div className="space-y-2 max-h-60 overflow-y-auto">
+            <div className="space-y-2 max-h-60 overflow-y-auto w-full">
                 {results.map((video) => (
-                    <div key={video.id} className="flex items-center gap-3 p-2 bg-gray-700/50 rounded hover:bg-gray-700 transition-colors">
-                        <img src={video.thumbnail} alt={video.title} className="w-12 h-9 object-cover rounded" />
+                    <div
+                        key={video.id}
+                        className="flex items-center gap-3 p-2 bg-gray-700/50 rounded hover:bg-gray-700 transition-colors w-full"
+                    >
+                        <img src={video.thumbnail} alt={video.title} className="w-12 h-9 object-cover rounded shrink-0" />
                         <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-white truncate">{video.title}</p>
-                            <p className="text-xs text-gray-400">{video.channelTitle}</p>
+                            <p className="text-sm font-medium text-white line-clamp-2 break-words">{video.title}</p>
+                            <p className="text-xs text-gray-400 truncate break-words">{video.channelTitle}</p>
                         </div>
                         <button
                             onClick={() => handleAdd(video)}
-                            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded"
+                            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded whitespace-nowrap"
                         >
                             Adicionar
                         </button>

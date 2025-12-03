@@ -22,14 +22,6 @@ type Song = {
   uuid: string; // Unique ID for queue item
 };
 
-type Room = {
-  id: string;
-  queue: Song[];
-  currentSong: Song | null;
-  hostId: string;
-  createdAt: number;
-};
-
 import { rooms } from '@/lib/store';
 
 // In-memory storage is now imported from @/lib/store

@@ -9,16 +9,25 @@ import { Song } from '@/types';
 function AdminContent() {
     const searchParams = useSearchParams();
     const roomId = searchParams?.get('room');
-    const { socket, isConnected } = useSocket();
+    const { socket } = useSocket();
 
     const [activeTab, setActiveTab] = useState<'controls' | 'queue' | 'add'>('controls');
     const [queue, setQueue] = useState<Song[]>([]);
     const [currentSong, setCurrentSong] = useState<Song | null>(null);
     const [isPlaying, setIsPlaying] = useState(true);
 
+    type JoinRoomResponse = {
+        success: boolean;
+        error?: string;
+        roomState?: {
+            queue: Song[];
+            currentSong: Song | null;
+        };
+    };
+
     useEffect(() => {
         if (socket && roomId) {
-            socket.emit('join_room', roomId, (response: any) => {
+            socket.emit('join_room', roomId, (response: JoinRoomResponse) => {
                 if (response.success) {
                     setQueue(response.roomState.queue);
                     setCurrentSong(response.roomState.currentSong);
