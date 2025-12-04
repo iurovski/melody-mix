@@ -5,6 +5,8 @@ interface VideoPlayerProps {
     currentSong: Song | null;
     onEnded: () => void;
     isPlaying: boolean;
+    onPlayPause: (action: 'play' | 'pause') => void;
+    onSkip: () => void;
 }
 
 declare global {
@@ -32,7 +34,7 @@ type YTNamespace = {
     ) => YouTubePlayer;
 };
 
-export const VideoPlayer: React.FC<VideoPlayerProps> = ({ currentSong, onEnded, isPlaying }) => {
+export const VideoPlayer: React.FC<VideoPlayerProps> = ({ currentSong, onEnded, isPlaying, onPlayPause, onSkip }) => {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const playerRef = useRef<YouTubePlayer | null>(null);
     const [isApiReady, setIsApiReady] = useState<boolean>(() => typeof window !== 'undefined' && !!window.YT);
@@ -148,7 +150,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ currentSong, onEnded, 
     const { url: embedUrl } = getEmbedUrl(currentSong.id);
 
     return (
-        <div className="w-full h-full bg-black relative">
+        <div className="w-full h-full min-h-[320px] bg-black relative">
             {/* 3. Referrer Policy & 4. Attributes */}
             <iframe
                 ref={iframeRef}
@@ -175,6 +177,22 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ currentSong, onEnded, 
                     Abrimos o vídeo no YouTube em uma nova aba. Ao terminar, feche a aba para tocar o próximo.
                 </div>
             )}
+
+            {/* Mobile playback controls */}
+            <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-black/70 border border-white/10 rounded-full px-3 py-2 shadow-lg backdrop-blur lg:hidden">
+                <button
+                    onClick={() => onPlayPause(isPlaying ? 'pause' : 'play')}
+                    className="px-3 py-1 rounded-full font-bold text-sm bg-[var(--neon-purple)]/70 hover:bg-[var(--neon-purple)] text-white transition-colors"
+                >
+                    {isPlaying ? '❚❚ Pausar' : '▶ Reproduzir'}
+                </button>
+                <button
+                    onClick={onSkip}
+                    className="px-3 py-1 rounded-full font-bold text-sm bg-white/10 hover:bg-white/20 text-white transition-colors border border-white/10"
+                >
+                    ⏭ Pular
+                </button>
+            </div>
         </div>
     );
 };

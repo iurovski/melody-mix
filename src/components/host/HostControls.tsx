@@ -113,7 +113,7 @@ export const HostControls: React.FC<HostControlsProps> = ({ queue, onRemove, onM
     };
 
     return (
-        <div className="w-full h-full bg-black/80 border-l border-[var(--neon-blue)] flex flex-col backdrop-blur-md">
+        <div className="w-full h-auto lg:h-full bg-black/80 border-t lg:border-t-0 lg:border-l border-[var(--neon-blue)] flex flex-col backdrop-blur-md">
             {/* Tabs */}
             <div className="flex border-b border-white/10">
                 <button

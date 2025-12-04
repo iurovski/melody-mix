@@ -14,6 +14,8 @@ export default function HostPage() {
     const [queue, setQueue] = useState<Song[]>([]);
     const [currentSong, setCurrentSong] = useState<Song | null>(null);
     const [isPlaying, setIsPlaying] = useState(true);
+    type RoomStatus = 'idle' | 'joining' | 'joined' | 'missing' | 'disconnected';
+    const [roomStatus, setRoomStatus] = useState<RoomStatus>('idle');
     const [adminQrVisible, setAdminQrVisible] = useState(true);
     const [adminTimer, setAdminTimer] = useState(120); // 2 minutes
     const [announcementData, setAnnouncementData] = useState<Song | null>(null);
@@ -24,6 +26,9 @@ export default function HostPage() {
         setLogs(prev => [...prev, `${new Date().toLocaleTimeString()} - ${msg}`]);
     }, []);
     const enqueueLog = useCallback((msg: string) => queueMicrotask(() => addLog(msg)), [addLog]);
+    const deferRoomStatus = useCallback((status: RoomStatus) => {
+        queueMicrotask(() => setRoomStatus(status));
+    }, []);
 
     type JoinRoomResponse = {
         success: boolean;
@@ -42,6 +47,17 @@ export default function HostPage() {
     // Socket Event Listeners
     useEffect(() => {
         if (!socket) return;
+
+        const handleConnect = () => {
+            setRoomStatus((prev) => {
+                if (roomId) return 'joining';
+                return prev === 'disconnected' ? 'idle' : prev;
+            });
+        };
+        const handleDisconnect = () => setRoomStatus('disconnected');
+
+        socket.on('connect', handleConnect);
+        socket.on('disconnect', handleDisconnect);
 
         socket.on('queue_updated', (updatedQueue: Song[]) => {
             setQueue(updatedQueue);
@@ -65,12 +81,14 @@ export default function HostPage() {
         });
 
         return () => {
+            socket.off('connect', handleConnect);
+            socket.off('disconnect', handleDisconnect);
             socket.off('queue_updated');
             socket.off('singer_announcement');
             socket.off('now_playing');
             socket.off('playback_action');
         };
-    }, [socket, addLog]);
+    }, [socket, addLog, roomId]);
 
     // ... (rest of the code)
 
@@ -100,23 +118,29 @@ export default function HostPage() {
     // Join room when roomId is set or socket reconnects
     useEffect(() => {
         if (socket && isConnected && roomId) {
+            deferRoomStatus('joining');
             enqueueLog(`Socket conectado (${socket.id}). Tentando entrar na sala: ${roomId}`);
             socket.emit('join_room', roomId, (response: JoinRoomResponse) => {
                 enqueueLog(`Join Room Response: ${JSON.stringify(response)}`);
                 if (!response.success) {
                     enqueueLog(`Erro ao entrar na sala: ${response.error}`);
                     if (response.error === 'Room not found') {
+                        deferRoomStatus('missing');
                         alert('A sala não existe mais no servidor. Por favor, recrie a sala.');
                         setRoomId(''); // Reset to allow recreation
+                    } else {
+                        deferRoomStatus('missing');
                     }
                 } else {
                     enqueueLog('Entrou na sala com sucesso!');
+                    deferRoomStatus('joined');
                 }
             });
         } else if (!isConnected && roomId) {
             enqueueLog('Socket desconectado. Aguardando reconexão...');
+            deferRoomStatus('disconnected');
         }
-    }, [socket, isConnected, roomId, enqueueLog]);
+    }, [socket, isConnected, roomId, enqueueLog, deferRoomStatus]);
 
     const createRoom = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -156,6 +180,22 @@ export default function HostPage() {
     };
 
     const handleSongEnd = () => {
+        if (socket && roomId) {
+            socket.emit('play_next', { roomId });
+        }
+    };
+
+    const handlePlayback = (action: 'play' | 'pause') => {
+        if (socket && roomId) {
+            if (action === 'play') {
+                socket.emit('start_performance', { roomId });
+            }
+            socket.emit('control_playback', { roomId, action });
+            setIsPlaying(action === 'play');
+        }
+    };
+
+    const handleSkip = () => {
         if (socket && roomId) {
             socket.emit('play_next', { roomId });
         }
@@ -276,9 +316,9 @@ export default function HostPage() {
     // ... (inside return)
 
     return (
-        <div className="flex h-screen bg-black overflow-hidden">
+        <div className="flex min-h-screen lg:h-screen flex-col lg:flex-row bg-black overflow-x-hidden lg:overflow-hidden">
             {/* Main Content - Video Player OR Announcement */}
-            <div className="flex-1 relative">
+            <div className="flex-1 relative min-h-[60vh] lg:min-h-0">
                 {adminQrVisible && (
                     <div className="absolute bottom-8 left-8 z-50 bg-black/80 border border-[var(--neon-purple)] rounded-2xl p-4 shadow-2xl shadow-purple-900/40 backdrop-blur-md w-72">
                         <div className="flex items-start justify-between mb-3 gap-2">
@@ -335,6 +375,8 @@ export default function HostPage() {
                         currentSong={currentSong}
                         onEnded={handleSongEnd}
                         isPlaying={isPlaying}
+                        onPlayPause={handlePlayback}
+                        onSkip={handleSkip}
                     />
                 ) : (
                     /* Idle Screen */
@@ -366,8 +408,20 @@ export default function HostPage() {
                     <p className="text-[var(--neon-blue)] font-mono text-xs">Room ID: {roomId}</p>
                     <p className="text-gray-500 font-mono text-[10px]">Socket: {socket?.id || '...'}</p>
                     <div className="flex items-center justify-end gap-2 mt-2 pointer-events-auto">
-                        <div className={`text-xs font-bold px-2 py-1 rounded inline-block ${isConnected ? 'bg-green-500/20 text-green-400 border border-green-500/50' : 'bg-red-500/20 text-red-400 border border-red-500/50 animate-pulse'}`}>
-                            {isConnected ? '● CONECTADO' : '○ DESCONECTADO'}
+                        <div
+                            className={`text-xs font-bold px-2 py-1 rounded inline-block border ${
+                                roomStatus === 'joined'
+                                    ? 'bg-green-500/20 text-green-400 border-green-500/50'
+                                    : roomStatus === 'joining'
+                                        ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/50 animate-pulse'
+                                        : 'bg-red-500/20 text-red-400 border-red-500/50'
+                            }`}
+                        >
+                            {roomStatus === 'joined' && '● SALA ATIVA'}
+                            {roomStatus === 'joining' && '… ENTRANDO NA SALA'}
+                            {roomStatus === 'missing' && '× SALA INDISPONÍVEL'}
+                            {roomStatus === 'disconnected' && '○ DESCONECTADO'}
+                            {roomStatus === 'idle' && '○ AGUARDANDO'}
                         </div>
                         {!isConnected && (
                             <button
@@ -382,7 +436,7 @@ export default function HostPage() {
             </div>
 
             {/* Sidebar - Controls */}
-            <div className="w-96 h-full border-l border-white/10">
+            <div className="w-full lg:w-96 lg:flex-shrink-0">
                 <HostControls
                     queue={queue}
                     onRemove={handleRemoveSong}
