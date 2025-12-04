@@ -30,6 +30,8 @@ interface HostControlsProps {
     onAdd: (song: Omit<Song, 'uuid' | 'addedAt'>) => void;
     onPlayNow: (uuid: string) => void;
     guestUrl: string;
+    guestQrVisible: boolean;
+    onToggleGuestQr: () => void;
 }
 
 function SortableItem({ song, index, onRemove, onPlayNow }: { song: Song; index: number; onRemove: (id: string) => void; onPlayNow: (id: string) => void }) {
@@ -92,7 +94,16 @@ function SortableItem({ song, index, onRemove, onPlayNow }: { song: Song; index:
     );
 }
 
-export const HostControls: React.FC<HostControlsProps> = ({ queue, onRemove, onMove, onAdd, onPlayNow, guestUrl }) => {
+export const HostControls: React.FC<HostControlsProps> = ({
+    queue,
+    onRemove,
+    onMove,
+    onAdd,
+    onPlayNow,
+    guestUrl,
+    guestQrVisible,
+    onToggleGuestQr,
+}) => {
     const [activeTab, setActiveTab] = useState<'queue' | 'add'>('queue');
 
     const sensors = useSensors(
@@ -177,13 +188,33 @@ export const HostControls: React.FC<HostControlsProps> = ({ queue, onRemove, onM
             </div>
 
             {/* QR Code Footer */}
-            <div className="p-4 border-t border-white/10 bg-black/40">
-                <div className="flex flex-col items-center justify-center gap-2">
-                    <div className="bg-white p-2 rounded-lg">
-                        <QRCodeSVG value={guestUrl} size={100} level="L" includeMargin={false} />
-                    </div>
-                    <p className="text-[var(--neon-blue)] text-xs font-bold uppercase tracking-wider">Entrar na Festa</p>
+            <div className="p-4 border-t border-white/10 bg-black/40 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs text-[var(--neon-blue)] font-bold uppercase tracking-wider">Convite via QR</p>
+                    <button
+                        type="button"
+                        onClick={onToggleGuestQr}
+                        className={`text-xs px-3 py-1 rounded border transition-all ${
+                            guestQrVisible
+                                ? 'bg-white/10 border-white/20 text-white hover:bg-white/20'
+                                : 'bg-black/40 border-red-500/40 text-red-300 hover:bg-red-500/10'
+                        }`}
+                    >
+                        {guestQrVisible ? 'Ocultar' : 'Mostrar'}
+                    </button>
                 </div>
+                {guestQrVisible ? (
+                    <div className="flex flex-col items-center justify-center gap-2">
+                        <div className="bg-white p-2 rounded-lg">
+                            <QRCodeSVG value={guestUrl} size={100} level="L" includeMargin={false} />
+                        </div>
+                        <p className="text-[var(--neon-blue)] text-xs font-bold uppercase tracking-wider">Entrar na Festa</p>
+                    </div>
+                ) : (
+                    <div className="text-center text-xs text-gray-400 bg-white/5 border border-white/10 rounded-lg py-4 px-3">
+                        Convite oculto. Use o controle manual na tela ou peça para o admin.
+                    </div>
+                )}
             </div>
         </div>
     );

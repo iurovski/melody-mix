@@ -16,6 +16,7 @@ export default function HostPage() {
     const [isPlaying, setIsPlaying] = useState(true);
     type RoomStatus = 'idle' | 'joining' | 'joined' | 'missing' | 'disconnected';
     const [roomStatus, setRoomStatus] = useState<RoomStatus>('idle');
+    const [guestQrVisible, setGuestQrVisible] = useState(true);
     const [adminQrVisible, setAdminQrVisible] = useState(true);
     const [adminTimer, setAdminTimer] = useState(120); // 2 minutes
     const [announcementData, setAnnouncementData] = useState<Song | null>(null);
@@ -43,6 +44,14 @@ export default function HostPage() {
         success?: boolean;
         error?: string;
     };
+
+    const toggleGuestQr = useCallback(() => {
+        setGuestQrVisible((prev) => {
+            const next = !prev;
+            addLog(next ? 'QR de convidados exibido' : 'QR de convidados oculto');
+            return next;
+        });
+    }, [addLog]);
 
     // Socket Event Listeners
     useEffect(() => {
@@ -393,10 +402,21 @@ export default function HostPage() {
                             </p>
 
                             <div className="bg-white/10 p-8 rounded-3xl border border-white/20 backdrop-blur-md inline-flex flex-col items-center gap-4 shadow-2xl shadow-purple-900/20">
-                                <div className="bg-white p-4 rounded-xl">
-                                    <QRCodeSVG value={guestUrl} size={200} level="L" includeMargin={false} />
-                                </div>
-                                <p className="text-[var(--neon-blue)] text-sm font-bold uppercase tracking-wider">Escaneie para pedir música</p>
+                                {guestQrVisible ? (
+                                    <>
+                                        <div className="bg-white p-4 rounded-xl">
+                                            <QRCodeSVG value={guestUrl} size={200} level="L" includeMargin={false} />
+                                        </div>
+                                        <p className="text-[var(--neon-blue)] text-sm font-bold uppercase tracking-wider">Escaneie para pedir música</p>
+                                    </>
+                                ) : (
+                                    <div className="text-center text-sm text-white/80 space-y-2">
+                                        <p className="font-semibold text-[var(--neon-pink)] uppercase">Convite oculto</p>
+                                        <p className="max-w-xs text-white/70">
+                                            O QR de convidados está desabilitado. Use o controle manual na tela ou peça para o admin abrir o convite.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -408,6 +428,15 @@ export default function HostPage() {
                     <p className="text-[var(--neon-blue)] font-mono text-xs">Room ID: {roomId}</p>
                     <p className="text-gray-500 font-mono text-[10px]">Socket: {socket?.id || '...'}</p>
                     <div className="flex items-center justify-end gap-2 mt-2 pointer-events-auto">
+                        <div
+                            className={`text-xs font-bold px-2 py-1 rounded inline-block border ${
+                                guestQrVisible
+                                    ? 'bg-[var(--neon-blue)]/20 text-[var(--neon-blue)] border-[var(--neon-blue)]/50'
+                                    : 'bg-red-500/20 text-red-300 border-red-500/50'
+                            }`}
+                        >
+                            {guestQrVisible ? 'Convite via QR ativo' : 'Convite via QR oculto'}
+                        </div>
                         <div
                             className={`text-xs font-bold px-2 py-1 rounded inline-block border ${
                                 roomStatus === 'joined'
@@ -444,6 +473,8 @@ export default function HostPage() {
                     onAdd={handleAddSong}
                     onPlayNow={handlePlayNow}
                     guestUrl={guestUrl}
+                    guestQrVisible={guestQrVisible}
+                    onToggleGuestQr={toggleGuestQr}
                 />
             </div>
         </div>
