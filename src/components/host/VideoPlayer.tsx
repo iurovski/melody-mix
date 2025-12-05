@@ -167,11 +167,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ currentSong, onEnded, 
             />
 
             {/* Overlay for Song Info */}
-            <div className="absolute top-4 left-4 sm:top-6 sm:left-6 lg:top-10 lg:left-10 bg-black/60 px-3 py-2 sm:p-4 rounded-xl border-l-4 border-[var(--neon-pink)] backdrop-blur-sm animate-fade-in-out pointer-events-none max-w-[90%] sm:max-w-lg">
-                <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-white leading-tight mb-1 sm:mb-1.5 line-clamp-2">
-                    {currentSong.title}
-                </h2>
-                <p className="text-xs sm:text-sm text-[var(--neon-pink)] truncate">Pedida por: {currentSong.addedBy}</p>
+            <div className="absolute top-1.5 sm:top-2 left-1/2 -translate-x-1/2 bg-black/60 px-3 py-2 sm:px-4 sm:py-2.5 rounded-full border border-[var(--neon-pink)]/50 backdrop-blur-sm animate-fade-in-out pointer-events-none max-w-[95%] sm:max-w-2xl flex items-center gap-3 sm:gap-4">
+                <div className="h-2 w-2 rounded-full bg-[var(--neon-pink)] shadow-[0_0_10px_rgba(255,0,128,0.8)] flex-shrink-0" />
+                <div className="flex-1 min-w-0 text-center sm:text-left">
+                    <h2 className="text-sm sm:text-base lg:text-lg font-bold text-white leading-tight line-clamp-1">
+                        {currentSong.title}
+                    </h2>
+                    <p className="text-[10px] sm:text-xs text-[var(--neon-pink)] truncate">Pedida por: {currentSong.addedBy}</p>
+                </div>
             </div>
 
             {fallbackActive && (

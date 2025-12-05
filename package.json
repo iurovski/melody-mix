@@ -3,9 +3,10 @@
   "version": "0.2.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "FAST_REFRESH=false NEXT_FAST_REFRESH=false next dev",
     "build": "next build",
     "start": "next start",
+    "preview": "npm run build && next start",
     "lint": "eslint",
     "test": "vitest",
     "test:watch": "vitest watch"

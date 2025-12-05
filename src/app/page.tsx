@@ -463,7 +463,7 @@ export default function HostPage() {
                 )}
 
                 {/* Room Info (Keep visible) */}
-                <div className="absolute top-8 right-8 text-right z-50 pointer-events-none">
+                <div className="absolute top-2 right-2 sm:top-4 sm:right-4 md:top-6 md:right-6 text-right z-50 pointer-events-none">
                     <h2 className="text-3xl font-bold text-white text-glow-blue">{roomName}</h2>
                     <p className="text-[var(--neon-blue)] font-mono text-xs">Room ID: {roomId}</p>
                     <p className="text-gray-500 font-mono text-[10px]">Socket: {socket?.id || '...'}</p>

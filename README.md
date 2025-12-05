@@ -6,4 +6,5 @@ Karaokê colaborativo em tempo real com três papéis principais: o host cria a 
 - Guia do usuário (host, admin, convidado): `docs/guia-usuarios.md`
 - Desenvolvimento: `npm run dev` inicia em `http://localhost:3000`
 - Produção: `npm run build` e depois `npm run start`
+- Preview local sem hot-reload (evita refresh da festa): `npm run preview`
 - Qualidade: `npm run lint` para checar estilo
