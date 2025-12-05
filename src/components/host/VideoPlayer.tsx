@@ -167,9 +167,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ currentSong, onEnded, 
             />
 
             {/* Overlay for Song Info */}
-            <div className="absolute top-10 left-10 bg-black/60 p-4 rounded-xl border-l-4 border-[var(--neon-pink)] backdrop-blur-sm animate-fade-in-out pointer-events-none">
-                <h2 className="text-2xl font-bold text-white mb-1">{currentSong.title}</h2>
-                <p className="text-[var(--neon-pink)]">Pedida por: {currentSong.addedBy}</p>
+            <div className="absolute top-4 left-4 sm:top-6 sm:left-6 lg:top-10 lg:left-10 bg-black/60 px-3 py-2 sm:p-4 rounded-xl border-l-4 border-[var(--neon-pink)] backdrop-blur-sm animate-fade-in-out pointer-events-none max-w-[90%] sm:max-w-lg">
+                <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-white leading-tight mb-1 sm:mb-1.5 line-clamp-2">
+                    {currentSong.title}
+                </h2>
+                <p className="text-xs sm:text-sm text-[var(--neon-pink)] truncate">Pedida por: {currentSong.addedBy}</p>
             </div>
 
             {fallbackActive && (
