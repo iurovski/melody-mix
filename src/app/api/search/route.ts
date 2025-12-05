@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import ytSearch, { type SearchResult as YtSearchResponse, type VideoSearchResult } from 'yt-search';
+import { blacklistedVideos } from '@/lib/store';
 
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
 const SEARCH_TIMEOUT_MS = 12000;
@@ -55,7 +56,7 @@ const searchWithScraper = async (query: string): Promise<SearchResult[]> => {
         thumbnail: video.thumbnail || video.image || `https://img.youtube.com/vi/${video.videoId}/mqdefault.jpg`,
         timestamp: video.timestamp,
         author: video.author?.name ?? 'YouTube',
-    }));
+    })).filter((item) => !blacklistedVideos.has(item.videoId));
 };
 
 const searchWithApi = async (query: string): Promise<SearchResult[] | null> => {
@@ -79,7 +80,7 @@ const searchWithApi = async (query: string): Promise<SearchResult[] | null> => {
             videoId: item.id.videoId,
             thumbnail: item.snippet.thumbnails.medium.url,
             author: item.snippet.channelTitle,
-        }));
+        })).filter((item) => !blacklistedVideos.has(item.videoId));
     } catch (error) {
         console.error('YouTube API Error:', error);
         return null;

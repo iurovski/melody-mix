@@ -1,6 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
 import React, { useState } from 'react';
 import { Song } from '@/types';
+import { useSocket } from '@/hooks/useSocket';
+import { VideoPreviewModal } from '@/components/VideoPreviewModal';
 
 interface SongSearchProps {
     onAdd: (song: Omit<Song, 'uuid' | 'addedAt'>) => void;
@@ -18,9 +20,11 @@ type SearchResult = {
 };
 
 export const SongSearch: React.FC<SongSearchProps> = ({ onAdd, guestName, forceScrape = false, onSourceChange }) => {
+    const { socket } = useSocket();
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<SearchResult[]>([]);
     const [loading, setLoading] = useState(false);
+    const [previewVideo, setPreviewVideo] = useState<SearchResult | null>(null);
 
     const searchYoutube = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -46,16 +50,31 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAdd, guestName, forceS
     };
 
     const handleSelect = (item: SearchResult) => {
+        setPreviewVideo(item);
+    };
+
+    const handleConfirm = () => {
+        if (!previewVideo) return;
         const song = {
-            id: item.videoId,
-            title: item.title,
-            thumbnail: item.thumbnail,
+            id: previewVideo.videoId,
+            title: previewVideo.title,
+            thumbnail: previewVideo.thumbnail,
             addedBy: guestName,
         };
         onAdd(song);
+        setPreviewVideo(null);
         setQuery('');
         setResults([]);
         alert('Música adicionada à fila!');
+    };
+
+    const handleRestriction = (videoId: string) => {
+        if (socket) {
+            socket.emit('blacklist_video', { videoId });
+        }
+        setResults((prev) => prev.filter((item) => item.videoId !== videoId));
+        setPreviewVideo(null);
+        alert('Vídeo indisponível para o Karaokê.');
     };
 
     return (
@@ -114,6 +133,16 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAdd, guestName, forceS
                     </div>
                 ))}
             </div>
+
+            {previewVideo && (
+                <VideoPreviewModal
+                    videoId={previewVideo.videoId}
+                    title={previewVideo.title}
+                    onConfirm={handleConfirm}
+                    onClose={() => setPreviewVideo(null)}
+                    onRestricted={handleRestriction}
+                />
+            )}
         </div>
     );
 };

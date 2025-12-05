@@ -4,9 +4,11 @@ import { Room } from '@/types';
 // especially in Next.js dev mode where modules might be re-evaluated.
 declare global {
     var rooms: Record<string, Room> | undefined;
+    var blacklistedVideos: Set<string> | undefined;
 }
 
 export const rooms: Record<string, Room> = globalThis.rooms || (globalThis.rooms = {});
+export const blacklistedVideos: Set<string> = globalThis.blacklistedVideos || (globalThis.blacklistedVideos = new Set());
 
 // Helper to create a room
 export const createRoomInStore = (roomName: string, hostId: string): Room => {

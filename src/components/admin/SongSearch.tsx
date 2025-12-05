@@ -3,6 +3,8 @@
 
 import React, { useState } from 'react';
 import { Song } from '@/types';
+import { useSocket } from '@/hooks/useSocket';
+import { VideoPreviewModal } from '@/components/VideoPreviewModal';
 
 interface SongSearchProps {
     onAddSong: (song: Omit<Song, 'uuid' | 'addedAt'>) => void;
@@ -19,10 +21,12 @@ type SearchResult = {
 };
 
 export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, forceScrape = false, onSourceChange }) => {
+    const { socket } = useSocket();
     const [query, setQuery] = useState('');
     const [userName, setUserName] = useState('');
     const [results, setResults] = useState<SearchResult[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [previewVideo, setPreviewVideo] = useState<SearchResult | null>(null);
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -60,10 +64,27 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, forceScrape =
             thumbnail: video.thumbnail,
             addedBy: userName,
         };
-        console.log('Adding song:', song);
         onAddSong(song);
         setQuery('');
         setResults([]);
+        setPreviewVideo(null);
+    };
+
+    const handleSelect = (video: SearchResult) => {
+        if (!userName.trim()) {
+            alert('Por favor, digite seu nome antes de adicionar.');
+            return;
+        }
+        setPreviewVideo(video);
+    };
+
+    const handleRestriction = (videoId: string) => {
+        if (socket) {
+            socket.emit('blacklist_video', { videoId });
+        }
+        setResults((prev) => prev.filter((v) => v.videoId !== videoId));
+        setPreviewVideo(null);
+        alert('Vídeo indisponível para o Karaokê.');
     };
 
     return (
@@ -124,14 +145,24 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, forceScrape =
                             {video.timestamp && <p className="text-[10px] text-gray-500 truncate">{video.timestamp}</p>}
                         </div>
                         <button
-                            onClick={() => handleAdd(video)}
-                            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded whitespace-nowrap"
+                            onClick={() => handleSelect(video)}
+                            className="px-3 py-1 bg-[var(--neon-blue)] hover:bg-white text-black text-xs font-bold rounded whitespace-nowrap transition-colors"
                         >
-                            Adicionar
+                            Pré-visualizar
                         </button>
                     </div>
                 ))}
             </div>
+
+            {previewVideo && (
+                <VideoPreviewModal
+                    videoId={previewVideo.videoId}
+                    title={previewVideo.title}
+                    onConfirm={() => handleAdd(previewVideo)}
+                    onClose={() => setPreviewVideo(null)}
+                    onRestricted={handleRestriction}
+                />
+            )}
         </div>
     );
 };
