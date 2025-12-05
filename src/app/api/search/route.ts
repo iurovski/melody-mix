@@ -1,75 +1,135 @@
 import { NextResponse } from 'next/server';
+import ytSearch, { type SearchResult as YtSearchResponse, type VideoSearchResult } from 'yt-search';
 
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
+const SEARCH_TIMEOUT_MS = 12000;
+
+type SearchResult = {
+    title: string;
+    videoId: string;
+    thumbnail: string;
+    timestamp?: string;
+    author?: string;
+};
+
+type YouTubeSearchItem = {
+    id: { videoId: string };
+    snippet: {
+        title: string;
+        thumbnails: { medium: { url: string } };
+        channelTitle: string;
+    };
+};
+
+const extractVideoId = (query: string) => {
+    const match = query.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+    return match?.[1];
+};
+
+const normalizeQuery = (raw: string) => {
+    const trimmed = raw.trim();
+    if (!trimmed) return '';
+    return trimmed.toLowerCase().includes('karaoke') ? trimmed : `${trimmed} karaoke`;
+};
+
+const withTimeout = async <T>(promise: Promise<T>, ms: number) => {
+    let timer: NodeJS.Timeout;
+    const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('search-timeout')), ms);
+    });
+
+    try {
+        return await Promise.race([promise, timeout]);
+    } finally {
+        clearTimeout(timer!);
+    }
+};
+
+const searchWithScraper = async (query: string): Promise<SearchResult[]> => {
+    const response = await withTimeout(ytSearch(query), SEARCH_TIMEOUT_MS) as YtSearchResponse;
+    const videos = Array.isArray(response.videos) ? response.videos : [];
+
+    return videos.slice(0, 10).map((video: VideoSearchResult) => ({
+        title: video.title,
+        videoId: video.videoId,
+        thumbnail: video.thumbnail || video.image || `https://img.youtube.com/vi/${video.videoId}/mqdefault.jpg`,
+        timestamp: video.timestamp,
+        author: video.author?.name ?? 'YouTube',
+    }));
+};
+
+const searchWithApi = async (query: string): Promise<SearchResult[] | null> => {
+    if (!YOUTUBE_API_KEY) return null;
+
+    try {
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&q=${encodeURIComponent(query)}&type=video&key=${YOUTUBE_API_KEY}`);
+        if (!res.ok) {
+            // If quota exceeded (403) or other errors, fall back to scraper
+            if (res.status === 403) return null;
+            throw new Error(`YouTube API error: ${res.status}`);
+        }
+
+        const data = await res.json();
+        if (!data.items) return null;
+
+        const items = data.items as YouTubeSearchItem[];
+        console.info('[search] using YouTube Data API');
+        return items.map((item) => ({
+            title: item.snippet.title,
+            videoId: item.id.videoId,
+            thumbnail: item.snippet.thumbnails.medium.url,
+            author: item.snippet.channelTitle,
+        }));
+    } catch (error) {
+        console.error('YouTube API Error:', error);
+        return null;
+    }
+};
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q');
+    const forceScrape = searchParams.get('forceScrape') === 'true' || searchParams.get('forceScrape') === '1';
 
     if (!query) {
         return NextResponse.json({ results: [] });
     }
 
-    // 1. Check if it's a direct YouTube URL
-    const videoIdMatch = query.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
-    if (videoIdMatch) {
-        const videoId = videoIdMatch[1];
-        // If we have an API key, we can fetch details, otherwise return a basic object
-        // For now, let's return a basic object to avoid dependency on API key for direct links
+    const directId = extractVideoId(query);
+    if (directId) {
+        console.info('[search] direct link detected, skipping API/scrape');
         return NextResponse.json({
             results: [{
-                id: videoId,
-                title: `YouTube Video (${videoId})`,
-                thumbnail: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
-                channelTitle: 'YouTube',
+                title: `YouTube Video (${directId})`,
+                videoId: directId,
+                thumbnail: `https://img.youtube.com/vi/${directId}/mqdefault.jpg`,
+                author: 'YouTube',
             }]
         });
     }
 
-    // 2. If API Key is present, search YouTube
-    if (YOUTUBE_API_KEY) {
-        try {
-            const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&q=${encodeURIComponent(query)}&type=video&key=${YOUTUBE_API_KEY}`);
-            const data = await res.json();
+    const searchQuery = normalizeQuery(query);
+    if (!searchQuery) {
+        return NextResponse.json({ results: [] });
+    }
 
-            if (data.items) {
-                type YouTubeSearchItem = {
-                    id: { videoId: string };
-                    snippet: {
-                        title: string;
-                        thumbnails: { medium: { url: string } };
-                        channelTitle: string;
-                    };
-                };
-
-                const results = (data.items as YouTubeSearchItem[]).map((item) => ({
-                    id: item.id.videoId,
-                    title: item.snippet.title,
-                    thumbnail: item.snippet.thumbnails.medium.url,
-                    channelTitle: item.snippet.channelTitle,
-                }));
-                return NextResponse.json({ results });
-            }
-        } catch (error) {
-            console.error('YouTube API Error:', error);
+    // Try YouTube API first (if available and not over quota)
+    if (!forceScrape) {
+        const apiResults = await searchWithApi(searchQuery);
+        if (apiResults && apiResults.length > 0) {
+            return NextResponse.json({ results: apiResults, source: 'api' });
         }
     }
 
-    // 3. Fallback: Mock results for testing if no key and not a URL
-    return NextResponse.json({
-        results: [
-            {
-                id: 'dQw4w9WgXcQ',
-                title: 'Rick Astley - Never Gonna Give You Up (Mock Result)',
-                thumbnail: 'https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg',
-                channelTitle: 'Rick Astley',
-            },
-            {
-                id: 'fJ9rUzIMcZQ',
-                title: 'Queen - Bohemian Rhapsody (Mock Result)',
-                thumbnail: 'https://img.youtube.com/vi/fJ9rUzIMcZQ/mqdefault.jpg',
-                channelTitle: 'Queen Official',
-            }
-        ]
-    });
+    // Fallback to scraping via yt-search with timeout protection
+    try {
+        const scrapedResults = await searchWithScraper(searchQuery);
+        console.info('[search] using yt-search scraping', { forceScrape });
+        return NextResponse.json({ results: scrapedResults, source: 'scraping' });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'unknown-error';
+        console.error('yt-search Error:', message);
+        const status = message === 'search-timeout' ? 504 : 500;
+        return NextResponse.json({ results: [], error: 'search_failed', source: 'scraping_error' }, { status });
+    }
 }

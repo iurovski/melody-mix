@@ -13,6 +13,7 @@ type JoinRoomResponse = {
     roomState?: {
         queue: Song[];
         currentSong: Song | null;
+        isPerforming?: boolean;
     };
 };
 
@@ -30,8 +31,9 @@ export function GuestView({ roomIdFromUrl }: { roomIdFromUrl?: string }) {
         if (socket && roomId && hasJoined) {
             socket.emit('join_room', roomId, (response: JoinRoomResponse) => {
                 if (response.success && response.roomState) {
-                    setQueue(response.roomState.queue);
-                    setCurrentSong(response.roomState.currentSong);
+                    const { queue: stateQueue, currentSong: stateSong, isPerforming } = response.roomState;
+                    setQueue(stateQueue);
+                    setCurrentSong(isPerforming ? stateSong : null);
                 } else {
                     alert('Erro ao entrar na sala: ' + response.error);
                 }

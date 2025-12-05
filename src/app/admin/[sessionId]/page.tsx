@@ -23,6 +23,7 @@ const AdminPage = () => {
         roomState?: {
             queue: Song[];
             currentSong: Song | null;
+            isPerforming?: boolean;
         };
     };
 
@@ -30,8 +31,15 @@ const AdminPage = () => {
         if (socket && isConnected && roomId) {
             socket.emit('join_room', roomId, (response: JoinRoomResponse) => {
                 if (response.success && response.roomState) {
-                    setQueue(response.roomState.queue);
-                    setCurrentSong(response.roomState.currentSong);
+                    const { queue: stateQueue, currentSong: stateSong, isPerforming } = response.roomState;
+                    setQueue(stateQueue);
+                    if (stateSong && isPerforming) {
+                        setCurrentSong(stateSong);
+                        setIsPlaying(true);
+                    } else {
+                        setCurrentSong(null);
+                        setIsPlaying(false);
+                    }
                     setStatus('Conectado');
                 } else {
                     setStatus(response.error || 'Sala não encontrada');

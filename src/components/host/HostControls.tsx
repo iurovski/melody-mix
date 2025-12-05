@@ -32,6 +32,10 @@ interface HostControlsProps {
     guestUrl: string;
     guestQrVisible: boolean;
     onToggleGuestQr: () => void;
+    useScraping: boolean;
+    onToggleScraping: () => void;
+    searchMode: 'api' | 'scraping';
+    onSearchSourceChange: (source: 'api' | 'scraping') => void;
 }
 
 function SortableItem({ song, index, onRemove, onPlayNow }: { song: Song; index: number; onRemove: (id: string) => void; onPlayNow: (id: string) => void }) {
@@ -103,6 +107,10 @@ export const HostControls: React.FC<HostControlsProps> = ({
     guestUrl,
     guestQrVisible,
     onToggleGuestQr,
+    useScraping,
+    onToggleScraping,
+    searchMode,
+    onSearchSourceChange,
 }) => {
     const [activeTab, setActiveTab] = useState<'queue' | 'add'>('queue');
 
@@ -181,7 +189,11 @@ export const HostControls: React.FC<HostControlsProps> = ({
                 ) : (
                     <div className="h-full overflow-y-auto">
                         <div className="[&>div]:bg-transparent [&>div]:shadow-none [&>div]:p-0">
-                            <SongSearch onAddSong={onAdd} />
+                            <SongSearch
+                                onAddSong={onAdd}
+                                forceScrape={useScraping}
+                                onSourceChange={onSearchSourceChange}
+                            />
                         </div>
                     </div>
                 )}
@@ -191,17 +203,38 @@ export const HostControls: React.FC<HostControlsProps> = ({
             <div className="p-4 border-t border-white/10 bg-black/40 space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <p className="text-xs text-[var(--neon-blue)] font-bold uppercase tracking-wider">Convite via QR</p>
-                    <button
-                        type="button"
-                        onClick={onToggleGuestQr}
-                        className={`text-xs px-3 py-1 rounded border transition-all ${
-                            guestQrVisible
-                                ? 'bg-white/10 border-white/20 text-white hover:bg-white/20'
-                                : 'bg-black/40 border-red-500/40 text-red-300 hover:bg-red-500/10'
-                        }`}
-                    >
-                        {guestQrVisible ? 'Ocultar' : 'Mostrar'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <span className={`text-[10px] px-2 py-1 rounded border ${
+                            searchMode === 'scraping'
+                                ? 'bg-orange-500/20 border-orange-400/60 text-orange-200'
+                                : 'bg-[var(--neon-blue)]/15 border-[var(--neon-blue)]/30 text-[var(--neon-blue)]'
+                        }`}>
+                            {searchMode === 'scraping' ? 'Modo: Scraping' : 'Modo: API'}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={onToggleScraping}
+                            className={`text-[10px] px-3 py-1 rounded border transition-all ${
+                                useScraping
+                                    ? 'bg-orange-500/20 border-orange-400/60 text-orange-200 hover:bg-orange-500/30'
+                                    : 'bg-black/40 border-white/15 text-gray-300 hover:bg-white/10'
+                            }`}
+                            title="Força busca via scraping (yt-search) em vez da API"
+                        >
+                            Sem API
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onToggleGuestQr}
+                            className={`text-xs px-3 py-1 rounded border transition-all ${
+                                guestQrVisible
+                                    ? 'bg-white/10 border-white/20 text-white hover:bg-white/20'
+                                    : 'bg-black/40 border-red-500/40 text-red-300 hover:bg-red-500/10'
+                            }`}
+                        >
+                            {guestQrVisible ? 'Ocultar' : 'Mostrar'}
+                        </button>
+                    </div>
                 </div>
                 {guestQrVisible ? (
                     <div className="flex flex-col items-center justify-center gap-2">
@@ -209,6 +242,9 @@ export const HostControls: React.FC<HostControlsProps> = ({
                             <QRCodeSVG value={guestUrl} size={100} level="L" includeMargin={false} />
                         </div>
                         <p className="text-[var(--neon-blue)] text-xs font-bold uppercase tracking-wider">Entrar na Festa</p>
+                        {useScraping && (
+                            <p className="text-[10px] text-orange-200/90 text-center">Busca em modo scraping ativada</p>
+                        )}
                     </div>
                 ) : (
                     <div className="text-center text-xs text-gray-400 bg-white/5 border border-white/10 rounded-lg py-4 px-3">

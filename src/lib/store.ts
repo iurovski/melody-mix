@@ -17,6 +17,7 @@ export const createRoomInStore = (roomName: string, hostId: string): Room => {
         currentSong: null,
         hostId,
         createdAt: Date.now(),
+        isPerforming: false,
     };
     rooms[roomId] = newRoom;
     return newRoom;

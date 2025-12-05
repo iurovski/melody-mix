@@ -60,6 +60,7 @@ const SocketHandler = (req: NextApiRequest, res: ExtendedResponse) => {
           currentSong: null,
           hostId: socket.id,
           createdAt: Date.now(),
+          isPerforming: false,
         };
         socket.join(roomId);
         console.log(`Room created: ${roomId} (${roomName})`);
@@ -103,6 +104,7 @@ const SocketHandler = (req: NextApiRequest, res: ExtendedResponse) => {
           // Auto-play if nothing is playing
           if (!room.currentSong) {
             room.currentSong = newSong;
+            room.isPerforming = false;
             // Emit announcement instead of playing immediately
             io.to(roomId).emit('singer_announcement', newSong);
             console.log(`[Socket] Announcing next singer in ${roomId}: ${song.title}`);
@@ -156,6 +158,7 @@ const SocketHandler = (req: NextApiRequest, res: ExtendedResponse) => {
 
             // Set as current
             room.currentSong = song;
+            room.isPerforming = false;
 
             // Emit announcement (Manual Start required)
             io.to(roomId).emit('singer_announcement', song);
@@ -172,12 +175,14 @@ const SocketHandler = (req: NextApiRequest, res: ExtendedResponse) => {
           if (room.queue.length > 0) {
             const nextSong = room.queue.shift();
             room.currentSong = nextSong || null;
+            room.isPerforming = false;
             // Emit announcement instead of playing immediately
             io.to(roomId).emit('singer_announcement', nextSong);
             io.to(roomId).emit('queue_updated', room.queue);
           } else {
             // Queue is empty, end playback (Idle State)
             room.currentSong = null;
+            room.isPerforming = false;
             io.to(roomId).emit('now_playing', null);
             io.to(roomId).emit('queue_updated', room.queue);
           }
@@ -188,6 +193,7 @@ const SocketHandler = (req: NextApiRequest, res: ExtendedResponse) => {
       socket.on('start_performance', ({ roomId }) => {
         const room = rooms[roomId];
         if (room && room.currentSong) {
+          room.isPerforming = true;
           io.to(roomId).emit('now_playing', room.currentSong);
         }
       });

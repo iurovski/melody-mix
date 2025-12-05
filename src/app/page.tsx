@@ -9,20 +9,27 @@ import { QRCodeSVG } from 'qrcode.react';
 
 export default function HostPage() {
     const { socket, isConnected } = useSocket();
-    const [roomName, setRoomName] = useState('');
-    const [roomId, setRoomId] = useState('');
+    const [roomName, setRoomName] = useState(() => {
+        if (typeof window === 'undefined') return '';
+        return sessionStorage.getItem('hostRoomName') || '';
+    });
+    const [roomId, setRoomId] = useState(() => {
+        if (typeof window === 'undefined') return '';
+        return sessionStorage.getItem('hostRoomId') || '';
+    });
     const [queue, setQueue] = useState<Song[]>([]);
     const [currentSong, setCurrentSong] = useState<Song | null>(null);
     const [isPlaying, setIsPlaying] = useState(true);
     type RoomStatus = 'idle' | 'joining' | 'joined' | 'missing' | 'disconnected';
     const [roomStatus, setRoomStatus] = useState<RoomStatus>('idle');
     const [guestQrVisible, setGuestQrVisible] = useState(true);
+    const [useScraping, setUseScraping] = useState(false);
+    const [searchMode, setSearchMode] = useState<'api' | 'scraping'>('api');
     const [adminQrVisible, setAdminQrVisible] = useState(true);
-    const [adminTimer, setAdminTimer] = useState(120); // 2 minutes
     const [announcementData, setAnnouncementData] = useState<Song | null>(null);
     const [isCreating, setIsCreating] = useState(false);
 
-    const [logs, setLogs] = useState<string[]>([]);
+    const [, setLogs] = useState<string[]>([]);
     const addLog = useCallback((msg: string) => {
         setLogs(prev => [...prev, `${new Date().toLocaleTimeString()} - ${msg}`]);
     }, []);
@@ -31,12 +38,20 @@ export default function HostPage() {
         queueMicrotask(() => setRoomStatus(status));
     }, []);
 
+    // Persist admin QR visibility
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const keyPrefix = roomId || 'host';
+        sessionStorage.setItem(`${keyPrefix}:adminQrVisible`, JSON.stringify(adminQrVisible));
+    }, [adminQrVisible, roomId]);
+
     type JoinRoomResponse = {
         success: boolean;
         error?: string;
         roomState?: {
             queue: Song[];
             currentSong: Song | null;
+            isPerforming?: boolean;
         };
     };
 
@@ -51,6 +66,20 @@ export default function HostPage() {
             addLog(next ? 'QR de convidados exibido' : 'QR de convidados oculto');
             return next;
         });
+    }, [addLog]);
+
+    const toggleScraping = useCallback(() => {
+        setUseScraping((prev) => {
+            const next = !prev;
+            addLog(next ? 'Modo Sem API (scraping) ativado' : 'Modo Sem API (scraping) desativado');
+            setSearchMode(next ? 'scraping' : 'api');
+            return next;
+        });
+    }, [addLog]);
+
+    const handleSearchSourceChange = useCallback((source: 'api' | 'scraping') => {
+        setSearchMode(source);
+        addLog(`Busca marcada como ${source === 'api' ? 'API' : 'scraping'}`);
     }, [addLog]);
 
     // Socket Event Listeners
@@ -107,6 +136,13 @@ export default function HostPage() {
         }
     };
 
+    // Persist identifiers whenever they change
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        if (roomId) sessionStorage.setItem('hostRoomId', roomId);
+        if (roomName) sessionStorage.setItem('hostRoomName', roomName);
+    }, [roomId, roomName]);
+
     // Listen for room_created event as fallback
     useEffect(() => {
         if (!socket) return;
@@ -116,13 +152,18 @@ export default function HostPage() {
             if (response && response.roomId) {
                 setRoomId(response.roomId);
                 setIsCreating(false);
+                if (typeof window !== 'undefined') {
+                    sessionStorage.setItem('hostRoomId', response.roomId);
+                    sessionStorage.setItem('hostRoomName', roomName);
+                    setAdminQrVisible(true);
+                }
             }
         });
 
         return () => {
             socket.off('room_created');
         };
-    }, [socket, enqueueLog]);
+    }, [socket, enqueueLog, roomName]);
 
     // Join room when roomId is set or socket reconnects
     useEffect(() => {
@@ -136,13 +177,32 @@ export default function HostPage() {
                     if (response.error === 'Room not found') {
                         deferRoomStatus('missing');
                         alert('A sala não existe mais no servidor. Por favor, recrie a sala.');
-                        setRoomId(''); // Reset to allow recreation
                     } else {
                         deferRoomStatus('missing');
                     }
                 } else {
                     enqueueLog('Entrou na sala com sucesso!');
                     deferRoomStatus('joined');
+                    if (response.roomState) {
+                        const { queue: stateQueue, currentSong: stateSong, isPerforming } = response.roomState;
+                        setQueue(stateQueue || []);
+
+                        if (stateSong) {
+                            if (isPerforming) {
+                                setAnnouncementData(null);
+                                setCurrentSong(stateSong);
+                                setIsPlaying(true);
+                            } else {
+                                setAnnouncementData(stateSong);
+                                setCurrentSong(null);
+                                setIsPlaying(false);
+                            }
+                        } else {
+                            setAnnouncementData(null);
+                            setCurrentSong(null);
+                            setIsPlaying(false);
+                        }
+                    }
                 }
             });
         } else if (!isConnected && roomId) {
@@ -266,23 +326,12 @@ export default function HostPage() {
     useEffect(() => {
         if (!roomId) return;
 
-        setTimeout(() => {
-            setAdminQrVisible(true);
-            setAdminTimer(120);
-        }, 0);
-
-        const interval = setInterval(() => {
-            setAdminTimer((prev) => {
-                if (prev <= 1) {
-                    clearInterval(interval);
-                    setAdminQrVisible(false);
-                    return 0;
-                }
-                return prev - 1;
+        const storedVisible = sessionStorage.getItem(`${roomId}:adminQrVisible`);
+        if (storedVisible !== null) {
+            queueMicrotask(() => {
+                setAdminQrVisible(storedVisible === 'true');
             });
-        }, 1000);
-
-        return () => clearInterval(interval);
+        }
     }, [roomId]);
 
     if (!roomId) {
@@ -312,12 +361,6 @@ export default function HostPage() {
                 </div>
 
                 {/* Debug Logs Area */}
-                <div className="fixed bottom-4 right-4 w-96 max-h-48 overflow-y-auto bg-black/80 text-green-400 p-4 rounded border border-green-900 font-mono text-xs z-50 pointer-events-none">
-                    <h3 className="font-bold border-b border-green-800 mb-2">Debug Logs</h3>
-                    {logs.map((log, i) => (
-                        <div key={i}>{log}</div>
-                    ))}
-                </div>
             </div>
         );
     }
@@ -336,9 +379,6 @@ export default function HostPage() {
                                 <p className="text-white text-sm">Escaneie para assumir a fila</p>
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className="px-2 py-1 text-[10px] font-bold rounded bg-white/10 border border-white/10 text-gray-300">
-                                    {Math.max(adminTimer, 0)}s
-                                </span>
                                 <button
                                     type="button"
                                     onClick={() => setAdminQrVisible(false)}
@@ -354,7 +394,7 @@ export default function HostPage() {
                                 <QRCodeSVG value={adminUrl} size={140} level="L" includeMargin={false} />
                             </div>
                             <p className="text-[var(--neon-purple)] text-xs uppercase tracking-wider text-center">
-                                Válido por 2 minutos após a criação
+                                Use para abrir o painel admin
                             </p>
                         </div>
                     </div>
@@ -430,6 +470,15 @@ export default function HostPage() {
                     <div className="flex items-center justify-end gap-2 mt-2 pointer-events-auto">
                         <div
                             className={`text-xs font-bold px-2 py-1 rounded inline-block border ${
+                                useScraping
+                                    ? 'bg-orange-500/20 text-orange-200 border-orange-400/60'
+                                : 'bg-white/5 text-gray-300 border-white/10'
+                            }`}
+                        >
+                            {useScraping ? 'Sem API (scraping)' : 'API / automático'}
+                        </div>
+                        <div
+                            className={`text-xs font-bold px-2 py-1 rounded inline-block border ${
                                 guestQrVisible
                                     ? 'bg-[var(--neon-blue)]/20 text-[var(--neon-blue)] border-[var(--neon-blue)]/50'
                                     : 'bg-red-500/20 text-red-300 border-red-500/50'
@@ -475,6 +524,10 @@ export default function HostPage() {
                     guestUrl={guestUrl}
                     guestQrVisible={guestQrVisible}
                     onToggleGuestQr={toggleGuestQr}
+                    useScraping={useScraping}
+                    onToggleScraping={toggleScraping}
+                    searchMode={searchMode}
+                    onSearchSourceChange={handleSearchSourceChange}
                 />
             </div>
         </div>

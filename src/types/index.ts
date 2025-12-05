@@ -13,4 +13,5 @@ export type Room = {
     currentSong: Song | null;
     hostId: string;
     createdAt: number;
+    isPerforming?: boolean;
 };

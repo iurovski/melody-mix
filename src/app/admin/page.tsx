@@ -22,6 +22,7 @@ function AdminContent() {
         roomState?: {
             queue: Song[];
             currentSong: Song | null;
+            isPerforming?: boolean;
         };
     };
 
@@ -29,8 +30,15 @@ function AdminContent() {
         if (socket && roomId) {
             socket.emit('join_room', roomId, (response: JoinRoomResponse) => {
                 if (response.success && response.roomState) {
-                    setQueue(response.roomState.queue);
-                    setCurrentSong(response.roomState.currentSong);
+                    const { queue: stateQueue, currentSong: stateSong, isPerforming } = response.roomState;
+                    setQueue(stateQueue);
+                    if (stateSong && isPerforming) {
+                        setCurrentSong(stateSong);
+                        setIsPlaying(true);
+                    } else {
+                        setCurrentSong(null);
+                        setIsPlaying(false);
+                    }
                 } else {
                     alert('Erro ao entrar na sala: ' + response.error);
                 }

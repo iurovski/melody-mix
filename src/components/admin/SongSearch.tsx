@@ -6,16 +6,19 @@ import { Song } from '@/types';
 
 interface SongSearchProps {
     onAddSong: (song: Omit<Song, 'uuid' | 'addedAt'>) => void;
+    forceScrape?: boolean;
+    onSourceChange?: (source: 'api' | 'scraping') => void;
 }
 
 type SearchResult = {
-    id: string;
+    videoId: string;
     title: string;
     thumbnail: string;
-    channelTitle: string;
+    author?: string;
+    timestamp?: string;
 };
 
-export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong }) => {
+export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, forceScrape = false, onSourceChange }) => {
     const [query, setQuery] = useState('');
     const [userName, setUserName] = useState('');
     const [results, setResults] = useState<SearchResult[]>([]);
@@ -27,16 +30,19 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong }) => {
 
         setIsLoading(true);
         try {
-            // Automatically append "karaoke" to the search query to ensure karaoke versions
-            const searchQuery = `${query} karaoke`;
-            const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`);
+            const res = await fetch(`/api/search?q=${encodeURIComponent(query.trim())}${forceScrape ? '&forceScrape=true' : ''}`);
             const data = await res.json();
             if (data.results) {
                 setResults(data.results as SearchResult[]);
+                if (onSourceChange) {
+                    const source = data.source === 'scraping' ? 'scraping' : 'api';
+                    onSourceChange(source);
+                }
             }
         } catch (error) {
             console.error('Error searching:', error);
             alert('Erro ao buscar músicas.');
+            if (onSourceChange) onSourceChange(forceScrape ? 'scraping' : 'api');
         } finally {
             setIsLoading(false);
         }
@@ -49,7 +55,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong }) => {
         }
 
         const song: Omit<Song, 'uuid' | 'addedAt'> = {
-            id: video.id,
+            id: video.videoId,
             title: video.title,
             thumbnail: video.thumbnail,
             addedBy: userName,
@@ -90,16 +96,32 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong }) => {
                 </form>
             </div>
 
-            <div className="space-y-2 max-h-60 overflow-y-auto w-full">
-                {results.map((video) => (
+            <div className="grid gap-3 max-h-96 overflow-y-auto w-full">
+                {isLoading && (
+                    <>
+                        {Array.from({ length: 3 }).map((_, idx) => (
+                            <div key={idx} className="flex items-center gap-3 p-3 bg-gray-700/30 rounded w-full animate-pulse">
+                                <div className="w-16 h-12 rounded bg-gray-600/50" />
+                                <div className="flex-1 space-y-2">
+                                    <div className="h-3 bg-gray-600/50 rounded w-4/5" />
+                                    <div className="h-2 bg-gray-600/40 rounded w-2/3" />
+                                </div>
+                                <div className="w-16 h-8 rounded bg-gray-600/40" />
+                            </div>
+                        ))}
+                    </>
+                )}
+
+                {!isLoading && results.map((video) => (
                     <div
-                        key={video.id}
-                        className="flex items-center gap-3 p-2 bg-gray-700/50 rounded hover:bg-gray-700 transition-colors w-full"
+                        key={video.videoId}
+                        className="flex items-center gap-3 p-3 bg-gray-700/50 rounded hover:bg-gray-700 transition-colors w-full"
                     >
-                        <img src={video.thumbnail} alt={video.title} className="w-12 h-9 object-cover rounded shrink-0" />
+                        <img src={video.thumbnail} alt={video.title} className="w-16 h-12 object-cover rounded shrink-0" />
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-white line-clamp-2 break-words">{video.title}</p>
-                            <p className="text-xs text-gray-400 truncate break-words">{video.channelTitle}</p>
+                            <p className="text-xs text-gray-400 truncate break-words">{video.author || 'YouTube'}</p>
+                            {video.timestamp && <p className="text-[10px] text-gray-500 truncate">{video.timestamp}</p>}
                         </div>
                         <button
                             onClick={() => handleAdd(video)}
