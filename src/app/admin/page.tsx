@@ -15,6 +15,7 @@ function AdminContent() {
     const [queue, setQueue] = useState<Song[]>([]);
     const [currentSong, setCurrentSong] = useState<Song | null>(null);
     const [isPlaying, setIsPlaying] = useState(true);
+    const [restrictionMode, setRestrictionMode] = useState<'blacklist' | 'open'>('blacklist');
 
     type JoinRoomResponse = {
         success: boolean;
@@ -23,6 +24,7 @@ function AdminContent() {
             queue: Song[];
             currentSong: Song | null;
             isPerforming?: boolean;
+            restrictionMode?: 'blacklist' | 'open';
         };
     };
 
@@ -30,7 +32,7 @@ function AdminContent() {
         if (socket && roomId) {
             socket.emit('join_room', roomId, (response: JoinRoomResponse) => {
                 if (response.success && response.roomState) {
-                    const { queue: stateQueue, currentSong: stateSong, isPerforming } = response.roomState;
+                    const { queue: stateQueue, currentSong: stateSong, isPerforming, restrictionMode: mode } = response.roomState;
                     setQueue(stateQueue);
                     if (stateSong && isPerforming) {
                         setCurrentSong(stateSong);
@@ -39,6 +41,7 @@ function AdminContent() {
                         setCurrentSong(null);
                         setIsPlaying(false);
                     }
+                    if (mode) setRestrictionMode(mode);
                 } else {
                     alert('Erro ao entrar na sala: ' + response.error);
                 }
@@ -56,11 +59,13 @@ function AdminContent() {
             socket.on('playback_action', (action: 'play' | 'pause') => {
                 setIsPlaying(action === 'play');
             });
+            socket.on('restriction_mode_changed', (mode: 'blacklist' | 'open') => setRestrictionMode(mode));
 
             return () => {
                 socket.off('queue_updated');
                 socket.off('now_playing');
                 socket.off('playback_action');
+                socket.off('restriction_mode_changed');
             };
         }
     }, [socket, roomId]);
@@ -163,8 +168,8 @@ function AdminContent() {
 
                 {activeTab === 'add' && (
                     <div className="mt-4">
-                <SongSearch onAdd={handleAddSong} guestName="ADMIN" roomId={roomId || undefined} />
-            </div>
+                        <SongSearch onAdd={handleAddSong} guestName="ADMIN" roomId={roomId || undefined} restrictionMode={restrictionMode} />
+                    </div>
                 )}
             </div>
 

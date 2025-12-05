@@ -10,6 +10,7 @@ interface SongSearchProps {
     forceScrape?: boolean;
     onSourceChange?: (source: 'api' | 'scraping') => void;
     roomId?: string;
+    restrictionMode?: 'blacklist' | 'open';
 }
 
 type SearchResult = {
@@ -20,7 +21,14 @@ type SearchResult = {
     timestamp?: string;
 };
 
-export const SongSearch: React.FC<SongSearchProps> = ({ onAdd, guestName, forceScrape = false, onSourceChange, roomId }) => {
+export const SongSearch: React.FC<SongSearchProps> = ({
+    onAdd,
+    guestName,
+    forceScrape = false,
+    onSourceChange,
+    roomId,
+    restrictionMode = 'blacklist',
+}) => {
     const { socket } = useSocket();
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<SearchResult[]>([]);
@@ -74,6 +82,21 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAdd, guestName, forceS
     };
 
     const handleRestriction = (videoId: string) => {
+        if (restrictionMode === 'open') {
+            if (previewVideo) {
+                const song = {
+                    id: previewVideo.videoId,
+                    title: previewVideo.title,
+                    thumbnail: previewVideo.thumbnail,
+                    addedBy: guestName,
+                };
+                onAdd(song);
+            }
+            alert('Música adicionada; ao iniciar, o vídeo abrirá no YouTube.');
+            setPreviewVideo(null);
+            return;
+        }
+
         if (socket) {
             socket.emit('blacklist_video', { videoId, roomId, author: previewVideo?.author });
         }

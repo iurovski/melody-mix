@@ -220,6 +220,19 @@ const SocketHandler = (req: NextApiRequest, res: ExtendedResponse) => {
         }
         console.log(`[Socket] Video blacklisted: ${videoId}`);
       });
+
+      socket.on('set_restriction_mode', ({ roomId, mode }: { roomId: string; mode: 'blacklist' | 'open' }) => {
+        const room = rooms[roomId];
+        if (!room) return;
+        room.restrictionMode = mode;
+        if (mode === 'open') {
+          blacklistedVideos.clear();
+          delete blacklistedAuthors[roomId];
+          console.log(`[Socket] Blacklist cleared for room ${roomId} (mode open)`);
+        }
+        io.to(roomId).emit('restriction_mode_changed', mode);
+        console.log(`[Socket] Restriction mode in ${roomId}: ${mode}`);
+      });
     });
   }
   res.end();

@@ -28,6 +28,7 @@ export default function HostPage() {
     const [adminQrVisible, setAdminQrVisible] = useState(true);
     const [announcementData, setAnnouncementData] = useState<Song | null>(null);
     const [isCreating, setIsCreating] = useState(false);
+    const [restrictionMode, setRestrictionMode] = useState<'blacklist' | 'open'>('blacklist');
 
     const [, setLogs] = useState<string[]>([]);
     const addLog = useCallback((msg: string) => {
@@ -52,6 +53,7 @@ export default function HostPage() {
             queue: Song[];
             currentSong: Song | null;
             isPerforming?: boolean;
+            restrictionMode?: 'blacklist' | 'open';
         };
     };
 
@@ -81,6 +83,13 @@ export default function HostPage() {
         setSearchMode(source);
         addLog(`Busca marcada como ${source === 'api' ? 'API' : 'scraping'}`);
     }, [addLog]);
+
+    const toggleRestrictionMode = useCallback(() => {
+        setRestrictionMode((prev) => prev === 'blacklist' ? 'open' : 'blacklist');
+        if (socket && roomId) {
+            socket.emit('set_restriction_mode', { roomId, mode: restrictionMode === 'blacklist' ? 'open' : 'blacklist' });
+        }
+    }, [socket, roomId, restrictionMode]);
 
     // Socket Event Listeners
     useEffect(() => {
@@ -132,6 +141,13 @@ export default function HostPage() {
 
     const handleStartPerformance = () => {
         if (socket && roomId) {
+            if (restrictionMode === 'open') {
+                const target = announcementData || currentSong;
+                if (target) {
+                    const watchUrl = `https://www.youtube.com/watch?v=${target.id}`;
+                    window.open(watchUrl, '_blank', 'noopener,noreferrer');
+                }
+            }
             socket.emit('start_performance', { roomId });
         }
     };
@@ -184,7 +200,7 @@ export default function HostPage() {
                     enqueueLog('Entrou na sala com sucesso!');
                     deferRoomStatus('joined');
                     if (response.roomState) {
-                        const { queue: stateQueue, currentSong: stateSong, isPerforming } = response.roomState;
+                        const { queue: stateQueue, currentSong: stateSong, isPerforming, restrictionMode: mode } = response.roomState;
                         setQueue(stateQueue || []);
 
                         if (stateSong) {
@@ -202,6 +218,7 @@ export default function HostPage() {
                             setCurrentSong(null);
                             setIsPlaying(false);
                         }
+                        if (mode) setRestrictionMode(mode);
                     }
                 }
             });
@@ -333,6 +350,15 @@ export default function HostPage() {
             });
         }
     }, [roomId]);
+
+    useEffect(() => {
+        if (!socket) return;
+        const handleMode = (mode: 'blacklist' | 'open') => setRestrictionMode(mode);
+        socket.on('restriction_mode_changed', handleMode);
+        return () => {
+            socket.off('restriction_mode_changed', handleMode);
+        };
+    }, [socket]);
 
     if (!roomId) {
         return (
@@ -529,6 +555,8 @@ export default function HostPage() {
                     searchMode={searchMode}
                     onSearchSourceChange={handleSearchSourceChange}
                     roomId={roomId}
+                    restrictionMode={restrictionMode}
+                    onToggleRestrictionMode={toggleRestrictionMode}
                 />
             </div>
         </div>

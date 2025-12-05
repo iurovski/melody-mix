@@ -22,6 +22,7 @@ export const createRoomInStore = (roomName: string, hostId: string): Room => {
         hostId,
         createdAt: Date.now(),
         isPerforming: false,
+        restrictionMode: 'blacklist',
     };
     rooms[roomId] = newRoom;
     return newRoom;

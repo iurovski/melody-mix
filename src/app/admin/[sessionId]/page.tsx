@@ -17,6 +17,7 @@ const AdminPage = () => {
     const [currentSong, setCurrentSong] = useState<Song | null>(null);
     const [isPlaying, setIsPlaying] = useState(true);
     const [status, setStatus] = useState('Aguardando conexão...');
+    const [restrictionMode, setRestrictionMode] = useState<'blacklist' | 'open'>('blacklist');
     type JoinRoomResponse = {
         success: boolean;
         error?: string;
@@ -24,6 +25,7 @@ const AdminPage = () => {
             queue: Song[];
             currentSong: Song | null;
             isPerforming?: boolean;
+            restrictionMode?: 'blacklist' | 'open';
         };
     };
 
@@ -31,7 +33,7 @@ const AdminPage = () => {
         if (socket && isConnected && roomId) {
             socket.emit('join_room', roomId, (response: JoinRoomResponse) => {
                 if (response.success && response.roomState) {
-                    const { queue: stateQueue, currentSong: stateSong, isPerforming } = response.roomState;
+                    const { queue: stateQueue, currentSong: stateSong, isPerforming, restrictionMode: mode } = response.roomState;
                     setQueue(stateQueue);
                     if (stateSong && isPerforming) {
                         setCurrentSong(stateSong);
@@ -40,6 +42,7 @@ const AdminPage = () => {
                         setCurrentSong(null);
                         setIsPlaying(false);
                     }
+                    if (mode) setRestrictionMode(mode);
                     setStatus('Conectado');
                 } else {
                     setStatus(response.error || 'Sala não encontrada');
@@ -57,15 +60,18 @@ const AdminPage = () => {
             setIsPlaying(true);
         };
         const handlePlayback = (action: 'play' | 'pause') => setIsPlaying(action === 'play');
+        const handleRestrictionMode = (mode: 'blacklist' | 'open') => setRestrictionMode(mode);
 
         socket.on('queue_updated', handleQueueUpdated);
         socket.on('now_playing', handleNowPlaying);
         socket.on('playback_action', handlePlayback);
+        socket.on('restriction_mode_changed', handleRestrictionMode);
 
         return () => {
             socket.off('queue_updated', handleQueueUpdated);
             socket.off('now_playing', handleNowPlaying);
             socket.off('playback_action', handlePlayback);
+            socket.off('restriction_mode_changed', handleRestrictionMode);
         };
     }, [socket]);
 
@@ -183,7 +189,7 @@ const AdminPage = () => {
                     </div>
 
                     <div className="bg-white/5 border border-white/10 rounded-2xl p-5 shadow-2xl shadow-purple-900/30">
-                        <SongSearch onAddSong={handleAddSong} roomId={roomId} />
+                        <SongSearch onAddSong={handleAddSong} roomId={roomId} restrictionMode={restrictionMode} />
                     </div>
                 </div>
 

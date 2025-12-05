@@ -14,4 +14,5 @@ export type Room = {
     hostId: string;
     createdAt: number;
     isPerforming?: boolean;
+    restrictionMode?: 'blacklist' | 'open';
 };

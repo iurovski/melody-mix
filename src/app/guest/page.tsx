@@ -14,6 +14,7 @@ type JoinRoomResponse = {
         queue: Song[];
         currentSong: Song | null;
         isPerforming?: boolean;
+        restrictionMode?: 'blacklist' | 'open';
     };
 };
 
@@ -26,14 +27,16 @@ export function GuestView({ roomIdFromUrl }: { roomIdFromUrl?: string }) {
     const [hasJoined, setHasJoined] = useState(false);
     const [queue, setQueue] = useState<Song[]>([]);
     const [currentSong, setCurrentSong] = useState<Song | null>(null);
+    const [restrictionMode, setRestrictionMode] = useState<'blacklist' | 'open'>('blacklist');
 
     useEffect(() => {
         if (socket && roomId && hasJoined) {
             socket.emit('join_room', roomId, (response: JoinRoomResponse) => {
                 if (response.success && response.roomState) {
-                    const { queue: stateQueue, currentSong: stateSong, isPerforming } = response.roomState;
+                    const { queue: stateQueue, currentSong: stateSong, isPerforming, restrictionMode: mode } = response.roomState;
                     setQueue(stateQueue);
                     setCurrentSong(isPerforming ? stateSong : null);
+                    if (mode) setRestrictionMode(mode);
                 } else {
                     alert('Erro ao entrar na sala: ' + response.error);
                 }
@@ -47,9 +50,12 @@ export function GuestView({ roomIdFromUrl }: { roomIdFromUrl?: string }) {
                 setCurrentSong(song);
             });
 
+            socket.on('restriction_mode_changed', (mode: 'blacklist' | 'open') => setRestrictionMode(mode));
+
             return () => {
                 socket.off('queue_updated');
                 socket.off('now_playing');
+                socket.off('restriction_mode_changed');
             };
         }
     }, [socket, roomId, hasJoined]);
@@ -143,7 +149,12 @@ export function GuestView({ roomIdFromUrl }: { roomIdFromUrl?: string }) {
 
             {/* Search */}
             <div className="p-4">
-                <SongSearch onAdd={handleAddSong} guestName={guestName} roomId={roomId || undefined} />
+                <SongSearch
+                    onAdd={handleAddSong}
+                    guestName={guestName}
+                    roomId={roomId || undefined}
+                    restrictionMode={restrictionMode}
+                />
             </div>
 
             {/* My Queue Status */}
