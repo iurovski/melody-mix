@@ -36,6 +36,7 @@ interface HostControlsProps {
     onToggleScraping: () => void;
     searchMode: 'api' | 'scraping';
     onSearchSourceChange: (source: 'api' | 'scraping') => void;
+    roomId?: string;
 }
 
 function SortableItem({ song, index, onRemove, onPlayNow }: { song: Song; index: number; onRemove: (id: string) => void; onPlayNow: (id: string) => void }) {
@@ -111,6 +112,7 @@ export const HostControls: React.FC<HostControlsProps> = ({
     onToggleScraping,
     searchMode,
     onSearchSourceChange,
+    roomId,
 }) => {
     const [activeTab, setActiveTab] = useState<'queue' | 'add'>('queue');
 
@@ -193,6 +195,7 @@ export const HostControls: React.FC<HostControlsProps> = ({
                                 onAddSong={onAdd}
                                 forceScrape={useScraping}
                                 onSourceChange={onSearchSourceChange}
+                                roomId={roomId}
                             />
                         </div>
                     </div>

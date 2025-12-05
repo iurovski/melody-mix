@@ -143,7 +143,7 @@ export function GuestView({ roomIdFromUrl }: { roomIdFromUrl?: string }) {
 
             {/* Search */}
             <div className="p-4">
-                <SongSearch onAdd={handleAddSong} guestName={guestName} />
+                <SongSearch onAdd={handleAddSong} guestName={guestName} roomId={roomId || undefined} />
             </div>
 
             {/* My Queue Status */}

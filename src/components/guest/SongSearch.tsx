@@ -9,6 +9,7 @@ interface SongSearchProps {
     guestName: string;
     forceScrape?: boolean;
     onSourceChange?: (source: 'api' | 'scraping') => void;
+    roomId?: string;
 }
 
 type SearchResult = {
@@ -19,20 +20,18 @@ type SearchResult = {
     timestamp?: string;
 };
 
-export const SongSearch: React.FC<SongSearchProps> = ({ onAdd, guestName, forceScrape = false, onSourceChange }) => {
+export const SongSearch: React.FC<SongSearchProps> = ({ onAdd, guestName, forceScrape = false, onSourceChange, roomId }) => {
     const { socket } = useSocket();
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<SearchResult[]>([]);
     const [loading, setLoading] = useState(false);
     const [previewVideo, setPreviewVideo] = useState<SearchResult | null>(null);
 
-    const searchYoutube = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!query.trim()) return;
-
+    const fetchResults = async (term: string) => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/search?q=${encodeURIComponent(query.trim())}${forceScrape ? '&forceScrape=true' : ''}`);
+            const roomParam = roomId ? `&roomId=${encodeURIComponent(roomId)}` : '';
+            const res = await fetch(`/api/search?q=${encodeURIComponent(term.trim())}${forceScrape ? '&forceScrape=true' : ''}${roomParam}`);
             const data = await res.json();
             if (data.results) {
                 setResults(data.results as SearchResult[]);
@@ -47,6 +46,12 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAdd, guestName, forceS
         } finally {
             setLoading(false);
         }
+    };
+
+    const searchYoutube = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!query.trim()) return;
+        fetchResults(query);
     };
 
     const handleSelect = (item: SearchResult) => {
@@ -70,9 +75,18 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAdd, guestName, forceS
 
     const handleRestriction = (videoId: string) => {
         if (socket) {
-            socket.emit('blacklist_video', { videoId });
+            socket.emit('blacklist_video', { videoId, roomId, author: previewVideo?.author });
         }
-        setResults((prev) => prev.filter((item) => item.videoId !== videoId));
+        setResults((prev) => {
+            const next = prev.filter((item) => {
+                if (previewVideo?.author) return item.author !== previewVideo.author;
+                return item.videoId !== videoId;
+            });
+            if (next.length === 0 && query.trim()) {
+                fetchResults(query);
+            }
+            return next;
+        });
         setPreviewVideo(null);
         alert('Vídeo indisponível para o Karaokê.');
     };

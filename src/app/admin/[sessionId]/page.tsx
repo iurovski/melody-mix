@@ -183,7 +183,7 @@ const AdminPage = () => {
                     </div>
 
                     <div className="bg-white/5 border border-white/10 rounded-2xl p-5 shadow-2xl shadow-purple-900/30">
-                        <SongSearch onAddSong={handleAddSong} />
+                        <SongSearch onAddSong={handleAddSong} roomId={roomId} />
                     </div>
                 </div>
 

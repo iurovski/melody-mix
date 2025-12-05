@@ -10,6 +10,7 @@ interface SongSearchProps {
     onAddSong: (song: Omit<Song, 'uuid' | 'addedAt'>) => void;
     forceScrape?: boolean;
     onSourceChange?: (source: 'api' | 'scraping') => void;
+    roomId?: string;
 }
 
 type SearchResult = {
@@ -20,7 +21,7 @@ type SearchResult = {
     timestamp?: string;
 };
 
-export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, forceScrape = false, onSourceChange }) => {
+export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, forceScrape = false, onSourceChange, roomId }) => {
     const { socket } = useSocket();
     const [query, setQuery] = useState('');
     const [userName, setUserName] = useState('');
@@ -28,13 +29,11 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, forceScrape =
     const [isLoading, setIsLoading] = useState(false);
     const [previewVideo, setPreviewVideo] = useState<SearchResult | null>(null);
 
-    const handleSearch = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!query.trim()) return;
-
+    const fetchResults = async (term: string) => {
         setIsLoading(true);
         try {
-            const res = await fetch(`/api/search?q=${encodeURIComponent(query.trim())}${forceScrape ? '&forceScrape=true' : ''}`);
+            const roomParam = roomId ? `&roomId=${encodeURIComponent(roomId)}` : '';
+            const res = await fetch(`/api/search?q=${encodeURIComponent(term.trim())}${forceScrape ? '&forceScrape=true' : ''}${roomParam}`);
             const data = await res.json();
             if (data.results) {
                 setResults(data.results as SearchResult[]);
@@ -50,6 +49,12 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, forceScrape =
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleSearch = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!query.trim()) return;
+        fetchResults(query);
     };
 
     const handleAdd = (video: SearchResult) => {
@@ -80,9 +85,18 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, forceScrape =
 
     const handleRestriction = (videoId: string) => {
         if (socket) {
-            socket.emit('blacklist_video', { videoId });
+            socket.emit('blacklist_video', { videoId, roomId, author: previewVideo?.author });
         }
-        setResults((prev) => prev.filter((v) => v.videoId !== videoId));
+        setResults((prev) => {
+            const next = prev.filter((v) => {
+                if (previewVideo?.author) return v.author !== previewVideo.author;
+                return v.videoId !== videoId;
+            });
+            if (next.length === 0 && query.trim()) {
+                fetchResults(query);
+            }
+            return next;
+        });
         setPreviewVideo(null);
         alert('Vídeo indisponível para o Karaokê.');
     };

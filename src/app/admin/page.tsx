@@ -163,8 +163,8 @@ function AdminContent() {
 
                 {activeTab === 'add' && (
                     <div className="mt-4">
-                        <SongSearch onAdd={handleAddSong} guestName="ADMIN" />
-                    </div>
+                <SongSearch onAdd={handleAddSong} guestName="ADMIN" roomId={roomId || undefined} />
+            </div>
                 )}
             </div>
 

@@ -5,10 +5,12 @@ import { Room } from '@/types';
 declare global {
     var rooms: Record<string, Room> | undefined;
     var blacklistedVideos: Set<string> | undefined;
+    var blacklistedAuthors: Record<string, Set<string>> | undefined;
 }
 
 export const rooms: Record<string, Room> = globalThis.rooms || (globalThis.rooms = {});
 export const blacklistedVideos: Set<string> = globalThis.blacklistedVideos || (globalThis.blacklistedVideos = new Set());
+export const blacklistedAuthors: Record<string, Set<string>> = globalThis.blacklistedAuthors || (globalThis.blacklistedAuthors = {});
 
 // Helper to create a room
 export const createRoomInStore = (roomName: string, hostId: string): Room => {

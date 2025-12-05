@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import ytSearch, { type SearchResult as YtSearchResponse, type VideoSearchResult } from 'yt-search';
-import { blacklistedVideos } from '@/lib/store';
+import { blacklistedVideos, blacklistedAuthors } from '@/lib/store';
 
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
 const SEARCH_TIMEOUT_MS = 12000;
@@ -46,24 +46,31 @@ const withTimeout = async <T>(promise: Promise<T>, ms: number) => {
     }
 };
 
-const searchWithScraper = async (query: string): Promise<SearchResult[]> => {
-    const response = await withTimeout(ytSearch(query), SEARCH_TIMEOUT_MS) as YtSearchResponse;
+const searchWithScraper = async (query: string, roomId?: string): Promise<SearchResult[]> => {
+    const response = await withTimeout(ytSearch({ query, pageEnd: 2 }), SEARCH_TIMEOUT_MS) as YtSearchResponse;
     const videos = Array.isArray(response.videos) ? response.videos : [];
 
-    return videos.slice(0, 10).map((video: VideoSearchResult) => ({
-        title: video.title,
-        videoId: video.videoId,
-        thumbnail: video.thumbnail || video.image || `https://img.youtube.com/vi/${video.videoId}/mqdefault.jpg`,
-        timestamp: video.timestamp,
-        author: video.author?.name ?? 'YouTube',
-    })).filter((item) => !blacklistedVideos.has(item.videoId));
+    const blacklist = roomId ? blacklistedAuthors[roomId] : undefined;
+
+    return videos
+        .slice(0, 20)
+        .map((video: VideoSearchResult) => ({
+            title: video.title,
+            videoId: video.videoId,
+            thumbnail: video.thumbnail || video.image || `https://img.youtube.com/vi/${video.videoId}/mqdefault.jpg`,
+            timestamp: video.timestamp,
+            author: video.author?.name ?? 'YouTube',
+        }))
+        .filter((item) => !blacklistedVideos.has(item.videoId))
+        .filter((item) => !(blacklist && item.author && blacklist.has(item.author)))
+        .slice(0, 10);
 };
 
-const searchWithApi = async (query: string): Promise<SearchResult[] | null> => {
+const searchWithApi = async (query: string, roomId?: string): Promise<SearchResult[] | null> => {
     if (!YOUTUBE_API_KEY) return null;
 
     try {
-        const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&q=${encodeURIComponent(query)}&type=video&key=${YOUTUBE_API_KEY}`);
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=20&q=${encodeURIComponent(query)}&type=video&key=${YOUTUBE_API_KEY}`);
         if (!res.ok) {
             // If quota exceeded (403) or other errors, fall back to scraper
             if (res.status === 403) return null;
@@ -75,12 +82,17 @@ const searchWithApi = async (query: string): Promise<SearchResult[] | null> => {
 
         const items = data.items as YouTubeSearchItem[];
         console.info('[search] using YouTube Data API');
-        return items.map((item) => ({
-            title: item.snippet.title,
-            videoId: item.id.videoId,
-            thumbnail: item.snippet.thumbnails.medium.url,
-            author: item.snippet.channelTitle,
-        })).filter((item) => !blacklistedVideos.has(item.videoId));
+        const blacklist = roomId ? blacklistedAuthors[roomId] : undefined;
+        return items
+            .map((item) => ({
+                title: item.snippet.title,
+                videoId: item.id.videoId,
+                thumbnail: item.snippet.thumbnails.medium.url,
+                author: item.snippet.channelTitle,
+            }))
+            .filter((item) => !blacklistedVideos.has(item.videoId))
+            .filter((item) => !(blacklist && item.author && blacklist.has(item.author)))
+            .slice(0, 10);
     } catch (error) {
         console.error('YouTube API Error:', error);
         return null;
@@ -91,6 +103,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q');
     const forceScrape = searchParams.get('forceScrape') === 'true' || searchParams.get('forceScrape') === '1';
+    const roomId = searchParams.get('roomId') || undefined;
 
     if (!query) {
         return NextResponse.json({ results: [] });
@@ -116,7 +129,7 @@ export async function GET(request: Request) {
 
     // Try YouTube API first (if available and not over quota)
     if (!forceScrape) {
-        const apiResults = await searchWithApi(searchQuery);
+        const apiResults = await searchWithApi(searchQuery, roomId);
         if (apiResults && apiResults.length > 0) {
             return NextResponse.json({ results: apiResults, source: 'api' });
         }
@@ -124,7 +137,7 @@ export async function GET(request: Request) {
 
     // Fallback to scraping via yt-search with timeout protection
     try {
-        const scrapedResults = await searchWithScraper(searchQuery);
+        const scrapedResults = await searchWithScraper(searchQuery, roomId);
         console.info('[search] using yt-search scraping', { forceScrape });
         return NextResponse.json({ results: scrapedResults, source: 'scraping' });
     } catch (error) {

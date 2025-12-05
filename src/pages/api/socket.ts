@@ -22,7 +22,7 @@ type Song = {
   uuid: string; // Unique ID for queue item
 };
 
-import { rooms, blacklistedVideos } from '@/lib/store';
+import { rooms, blacklistedVideos, blacklistedAuthors } from '@/lib/store';
 
 // In-memory storage is now imported from @/lib/store
 
@@ -208,9 +208,16 @@ const SocketHandler = (req: NextApiRequest, res: ExtendedResponse) => {
         // Optional: Cleanup empty rooms after delay
       });
 
-      socket.on('blacklist_video', ({ videoId }: { videoId: string }) => {
+      socket.on('blacklist_video', ({ videoId, roomId, author }: { videoId: string; roomId?: string; author?: string }) => {
         if (!videoId) return;
         blacklistedVideos.add(videoId);
+        if (roomId && author) {
+          if (!blacklistedAuthors[roomId]) {
+            blacklistedAuthors[roomId] = new Set();
+          }
+          blacklistedAuthors[roomId].add(author);
+          console.log(`[Socket] Blacklisted author in room ${roomId}: ${author}`);
+        }
         console.log(`[Socket] Video blacklisted: ${videoId}`);
       });
     });

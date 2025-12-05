@@ -528,6 +528,7 @@ export default function HostPage() {
                     onToggleScraping={toggleScraping}
                     searchMode={searchMode}
                     onSearchSourceChange={handleSearchSourceChange}
+                    roomId={roomId}
                 />
             </div>
         </div>
