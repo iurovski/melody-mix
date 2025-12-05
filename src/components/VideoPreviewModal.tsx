@@ -85,9 +85,9 @@ export const VideoPreviewModal: React.FC<VideoPreviewModalProps> = ({
                 <div className="mt-5 flex flex-col sm:flex-row gap-3">
                     <button
                         onClick={onConfirm}
-                        disabled={disabled || state === 'restricted'}
+                        disabled={disabled}
                         className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${
-                            disabled || state === 'restricted'
+                            disabled
                                 ? 'bg-white/10 text-gray-500 cursor-not-allowed'
                                 : 'bg-[var(--neon-blue)] text-black hover:bg-white'
                         }`}
