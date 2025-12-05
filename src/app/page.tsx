@@ -362,9 +362,9 @@ export default function HostPage() {
 
     if (!roomId) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-black text-white">
+            <div className="min-h-screen flex items-center justify-center bg-black text-white relative">
                 <div className="w-full max-w-md p-8 rounded-2xl bg-white/5 border border-[var(--neon-purple)] box-glow-purple backdrop-blur-xl">
-                    <h1 className="text-4xl font-bold text-center mb-8 text-glow-purple">MELODY MIX</h1>
+                    <h1 className="text-4xl font-bold text-center mb-2 text-glow-purple">MELODY MIX</h1>
                     <form onSubmit={createRoom} className="space-y-6">
                         <div>
                             <label className="block text-sm font-medium text-[var(--neon-blue)] mb-2">Nome da Festa</label>
@@ -386,7 +386,9 @@ export default function HostPage() {
                     </form>
                 </div>
 
-                {/* Debug Logs Area */}
+                <p className="absolute bottom-8 left-1/2 -translate-x-1/2 text-center text-sm text-gray-500">
+                    by Danilo Iurovski
+                </p>
             </div>
         );
     }
