@@ -203,42 +203,7 @@ export const HostControls: React.FC<HostControlsProps> = ({
             </div>
 
             {/* QR Code Footer */}
-            <div className="p-4 border-t border-white/10 bg-black/40 space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs text-[var(--neon-blue)] font-bold uppercase tracking-wider">Convite via QR</p>
-                    <div className="flex items-center gap-2">
-                        <span className={`text-[10px] px-2 py-1 rounded border ${
-                            searchMode === 'scraping'
-                                ? 'bg-orange-500/20 border-orange-400/60 text-orange-200'
-                                : 'bg-[var(--neon-blue)]/15 border-[var(--neon-blue)]/30 text-[var(--neon-blue)]'
-                        }`}>
-                            {searchMode === 'scraping' ? 'Modo: Scraping' : 'Modo: API'}
-                        </span>
-                        <button
-                            type="button"
-                            onClick={onToggleScraping}
-                            className={`text-[10px] px-3 py-1 rounded border transition-all ${
-                                useScraping
-                                    ? 'bg-orange-500/20 border-orange-400/60 text-orange-200 hover:bg-orange-500/30'
-                                    : 'bg-black/40 border-white/15 text-gray-300 hover:bg-white/10'
-                            }`}
-                            title="Força busca via scraping (yt-search) em vez da API"
-                        >
-                            Sem API
-                        </button>
-                        <button
-                            type="button"
-                            onClick={onToggleGuestQr}
-                            className={`text-xs px-3 py-1 rounded border transition-all ${
-                                guestQrVisible
-                                    ? 'bg-white/10 border-white/20 text-white hover:bg-white/20'
-                                    : 'bg-black/40 border-red-500/40 text-red-300 hover:bg-red-500/10'
-                            }`}
-                        >
-                            {guestQrVisible ? 'Ocultar' : 'Mostrar'}
-                        </button>
-                    </div>
-                </div>
+            <div className="p-4 border-t border-white/10 bg-black/40 space-y-4 max-h-64 overflow-y-auto">
                 {guestQrVisible ? (
                     <div className="flex flex-col items-center justify-center gap-2">
                         <div className="bg-white p-2 rounded-lg">
@@ -254,6 +219,44 @@ export const HostControls: React.FC<HostControlsProps> = ({
                         Convite oculto. Use o controle manual na tela ou peça para o admin.
                     </div>
                 )}
+
+                <div className="pt-2 border-t border-white/10 space-y-2">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-gray-500 text-center">Role para ajustar</p>
+                    <div className="flex items-center justify-between gap-3">
+                        <span className={`text-[10px] px-2 py-1 rounded border ${
+                            searchMode === 'scraping'
+                                ? 'bg-orange-500/20 border-orange-400/60 text-orange-200'
+                                : 'bg-[var(--neon-blue)]/15 border-[var(--neon-blue)]/30 text-[var(--neon-blue)]'
+                        }`}>
+                            {searchMode === 'scraping' ? 'Modo: Scraping' : 'Modo: API'}
+                        </span>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={onToggleScraping}
+                                className={`text-[10px] px-3 py-1 rounded border transition-all ${
+                                    useScraping
+                                        ? 'bg-orange-500/20 border-orange-400/60 text-orange-200 hover:bg-orange-500/30'
+                                        : 'bg-black/40 border-white/15 text-gray-300 hover:bg-white/10'
+                                }`}
+                                title="Força busca via scraping (yt-search) em vez da API"
+                            >
+                                Sem API
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onToggleGuestQr}
+                                className={`text-xs px-3 py-1 rounded border transition-all ${
+                                    guestQrVisible
+                                        ? 'bg-white/10 border-white/20 text-white hover:bg-white/20'
+                                        : 'bg-black/40 border-red-500/40 text-red-300 hover:bg-red-500/10'
+                                }`}
+                            >
+                                {guestQrVisible ? 'Ocultar' : 'Mostrar'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     );
